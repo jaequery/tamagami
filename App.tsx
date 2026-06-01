@@ -1,20 +1,24 @@
+import React from 'react';
+import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import {
+  useFonts,
+  PressStart2P_400Regular,
+} from '@expo-google-fonts/press-start-2p';
+import { HomeScreen } from './src/screens/HomeScreen';
 
-export default function App() {
+export default function App(): React.ReactElement | null {
+  const [fontsLoaded] = useFonts({ PressStart2P_400Regular });
+
+  if (!fontsLoaded) {
+    // Hold the splash until fonts are ready; the native splash stays visible.
+    return null;
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
+    <View style={{ flex: 1 }}>
+      <StatusBar style="light" />
+      <HomeScreen />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
