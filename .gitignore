@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# supabuild build artifacts (kept on disk, not in history)
+.supabuild/
