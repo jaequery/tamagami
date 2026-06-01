@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
   clean,
@@ -76,19 +76,35 @@ export function usePet(): UsePet {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Tick interval (1s) ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (loading) return;
+  // ── Tick interval (1s) — only runs while app is foregrounded ─────────────
+  // Fix #10: interval is created/cleared in step with AppState so it does not
+  // fire while backgrounded (the AppState catch-up already handles that time).
+  const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const id = setInterval(() => {
+  const startTick = useCallback(() => {
+    if (tickIntervalRef.current !== null) return; // already running
+    tickIntervalRef.current = setInterval(() => {
       const current = petRef.current;
       if (current.isDead) return;
       const next = simulate(current, Date.now());
       applyState(next);
     }, TICK_INTERVAL_MS);
+  }, [applyState]);
 
-    return () => clearInterval(id);
-  }, [loading, applyState]);
+  const stopTick = useCallback(() => {
+    if (tickIntervalRef.current !== null) {
+      clearInterval(tickIntervalRef.current);
+      tickIntervalRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    // Start immediately when loading finishes (app is foregrounded at this point)
+    startTick();
+    return stopTick;
+  }, [loading, startTick, stopTick]);
 
   // ── AppState: catch-up on foreground, persist on background ──────────────
   useEffect(() => {
@@ -96,54 +112,71 @@ export function usePet(): UsePet {
 
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
+        // Fix #8: skip simulate/persist I/O if the pet is already dead
         const current = petRef.current;
+        if (current.isDead) return;
+
         const next = simulate(current, Date.now());
         applyState(next);
+
+        // Fix #10: restart the tick interval when returning to foreground
+        startTick();
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // Fix #10: pause the interval while backgrounded — no need to fire every second
+        stopTick();
         void persist(petRef.current, true);
       }
     });
 
     return () => subscription.remove();
-  }, [loading, applyState, persist]);
+  }, [loading, applyState, persist, startTick, stopTick]);
 
-  // ── Actions ───────────────────────────────────────────────────────────────
-  const actions: PetActions = {
-    feed: useCallback(() => {
-      const next = feed(petRef.current, Date.now());
-      applyState(next, true);
-    }, [applyState]),
+  // ── Individual action callbacks ───────────────────────────────────────────
+  const actionFeed = useCallback(() => {
+    const next = feed(petRef.current, Date.now());
+    applyState(next, true);
+  }, [applyState]);
 
-    play: useCallback(() => {
-      const next = play(petRef.current, Date.now());
-      applyState(next, true);
-    }, [applyState]),
+  const actionPlay = useCallback(() => {
+    const next = play(petRef.current, Date.now());
+    applyState(next, true);
+  }, [applyState]);
 
-    toggleSleep: useCallback(() => {
-      const next = toggleSleep(petRef.current, Date.now());
-      applyState(next, true);
-    }, [applyState]),
+  const actionToggleSleep = useCallback(() => {
+    const next = toggleSleep(petRef.current, Date.now());
+    applyState(next, true);
+  }, [applyState]);
 
-    clean: useCallback(() => {
-      const next = clean(petRef.current, Date.now());
-      applyState(next, true);
-    }, [applyState]),
+  const actionClean = useCallback(() => {
+    const next = clean(petRef.current, Date.now());
+    applyState(next, true);
+  }, [applyState]);
 
-    heal: useCallback(() => {
-      const next = heal(petRef.current, Date.now());
-      applyState(next, true);
-    }, [applyState]),
+  const actionHeal = useCallback(() => {
+    const next = heal(petRef.current, Date.now());
+    applyState(next, true);
+  }, [applyState]);
 
-    restart: useCallback((name?: string) => {
-      const next = engineRestart(petRef.current, Date.now(), name);
-      applyState(next, true);
-    }, [applyState]),
+  const actionRestart = useCallback((name?: string) => {
+    const next = engineRestart(petRef.current, Date.now(), name);
+    applyState(next, true);
+  }, [applyState]);
 
-    rename: useCallback((name: string) => {
-      const next = engineRename(petRef.current, name);
-      applyState(next, true);
-    }, [applyState]),
-  };
+  const actionRename = useCallback((name: string) => {
+    const next = engineRename(petRef.current, name);
+    applyState(next, true);
+  }, [applyState]);
+
+  // Fix #7: stable actions object — identity only changes when a callback dep changes
+  const actions: PetActions = useMemo(() => ({
+    feed: actionFeed,
+    play: actionPlay,
+    toggleSleep: actionToggleSleep,
+    clean: actionClean,
+    heal: actionHeal,
+    restart: actionRestart,
+    rename: actionRename,
+  }), [actionFeed, actionPlay, actionToggleSleep, actionClean, actionHeal, actionRestart, actionRename]);
 
   return {
     pet,

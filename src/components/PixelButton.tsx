@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     minHeight:         36,
   },
   faceDisabled: {
-    backgroundColor: '#B8CCAA',
+    backgroundColor: COLOR_BUTTON_DISABLED,
   },
   glyph: {
     marginRight: SPACE_2,

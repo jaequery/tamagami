@@ -13,6 +13,7 @@ import {
   SPACE_6,
   SPACE_8,
   SPACE_12,
+  DEVICE_FRAME_MIN_HEIGHT,
 } from '../theme';
 import { PixelText } from './PixelText';
 
@@ -20,13 +21,13 @@ interface DeviceFrameProps {
   children: React.ReactNode;
 }
 
-// Small decorative speaker dot
+// Square pixel speaker hole — no borderRadius so it reads as a hard pixel grid
 function SpeakerDot({ size = 4 }: { size?: number }): React.ReactElement {
   return (
     <View
       style={[
         styles.speakerDot,
-        { width: size, height: size, borderRadius: size / 2 },
+        { width: size, height: size },
       ]}
     />
   );
@@ -67,10 +68,11 @@ const styles = StyleSheet.create({
     backgroundColor: SHELL_COLOR,
     borderWidth:     BORDER_HEAVY,
     borderColor:     SHELL_DARK,
-    borderTopLeftRadius:     PIXEL * 6,
-    borderTopRightRadius:    PIXEL * 6,
-    borderBottomLeftRadius:  PIXEL * 4,
-    borderBottomRightRadius: PIXEL * 4,
+    // Hard chamfer: tighter top / even tighter bottom for retro feel
+    borderTopLeftRadius:     PIXEL * 3,
+    borderTopRightRadius:    PIXEL * 3,
+    borderBottomLeftRadius:  PIXEL * 2,
+    borderBottomRightRadius: PIXEL * 2,
     paddingHorizontal: SPACE_8,
     paddingBottom:     SPACE_8,
     // Hard-pixel top highlight rim
@@ -106,7 +108,7 @@ const styles = StyleSheet.create({
     backgroundColor: LCD_BG,
     paddingHorizontal: SPACE_6,
     paddingVertical:   SPACE_6,
-    minHeight:         200,
+    minHeight:         DEVICE_FRAME_MIN_HEIGHT,
   },
   speakerRow: {
     flexDirection:  'row',

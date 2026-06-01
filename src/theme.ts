@@ -26,6 +26,10 @@ export const COLOR_BUTTON_FACE    = '#D4E8A0';   // button face (lighter than LC
 export const COLOR_BUTTON_BORDER  = LCD_DARK;    // hard pixel border on buttons
 export const COLOR_BUTTON_PRESSED = LCD_SHADE2;  // pressed state fill
 export const COLOR_BUTTON_DISABLED = '#A0B060';  // muted/disabled button
+export const COLOR_OVERLAY        = 'rgba(15,56,15,0.88)'; // semi-transparent LCD green death overlay
+export const COLOR_POOP_DARK      = '#3B2A1A';   // poop glyph dark outline
+export const COLOR_POOP_LIGHT     = '#7B5C3A';   // poop glyph light fill
+export const COLOR_TEAR           = LCD_SHADE2;  // tear drop — dark green (sad ≠ sick)
 
 // ─── Typography ────────────────────────────────────────────────────────────
 export const FONT_FAMILY  = 'PressStart2P_400Regular';
@@ -57,7 +61,12 @@ export const SPACE_16 = PIXEL * 16;  // 32
 export const CELL_SIZE = 10; // pt per sprite cell
 
 // ─── Stat Bar ──────────────────────────────────────────────────────────────
-export const STAT_SEGMENTS      = 10;  // number of filled/empty blocks
-export const STAT_SEGMENT_WIDTH = PIXEL * 5;   // 10pt per segment
-export const STAT_SEGMENT_GAP   = PIXEL * 1;   //  2pt gap between segments
-export const STAT_WARN_THRESHOLD = 30;          // below this → warning color
+export const STAT_SEGMENTS        = 8;   // 8 segments fits 320pt frame after FONT_SM bump
+export const STAT_SEGMENT_WIDTH   = PIXEL * 5;   // 10pt per segment
+export const STAT_SEGMENT_GAP     = PIXEL * 1;   //  2pt gap between segments
+export const STAT_WARN_THRESHOLD  = 30;          // below this → warning color
+export const STAT_CRITICAL_THRESHOLD = 10;       // ≤ this → critical color + pulse
+
+// ─── Device Frame ──────────────────────────────────────────────────────────
+// Derived from spacing scale so no magic numbers in components.
+export const DEVICE_FRAME_MIN_HEIGHT = PIXEL * 100; // 200pt LCD content area

@@ -1,12 +1,14 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
   SafeAreaView,
+  Animated,
   StyleSheet,
 } from 'react-native';
 import { usePet } from '../hooks/usePet';
 import type { CauseOfDeath } from '../game/types';
+import { POOP_OVERFLOW_THRESHOLD } from '../game/constants';
 import { DeviceFrame } from '../components/DeviceFrame';
 import { PetSprite } from '../components/PetSprite';
 import { StatBar } from '../components/StatBar';
@@ -17,7 +19,12 @@ import {
   LCD_DARK,
   LCD_SHADE2,
   COLOR_WARNING,
+  COLOR_CRITICAL,
+  COLOR_OVERLAY,
+  COLOR_POOP_DARK,
+  COLOR_POOP_LIGHT,
   SHELL_DARK,
+  SPACE_1,
   SPACE_2,
   SPACE_4,
   SPACE_6,
@@ -25,14 +32,15 @@ import {
   SPACE_12,
   PIXEL,
   BORDER_WIDTH,
+  STAT_CRITICAL_THRESHOLD,
 } from '../theme';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function formatAge(seconds: number): string {
-  if (seconds < 60)        return `${seconds}s`;
-  if (seconds < 3600)      return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400)     return `${Math.floor(seconds / 3600)}h`;
+  if (seconds < 60)    return `${Math.floor(seconds)}s`;
+  if (seconds < 3600)  return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
   return `${Math.floor(seconds / 86400)}d`;
 }
 
@@ -55,10 +63,11 @@ const POOP_MATRIX = [
   [0,1,2,1,0],
   [0,0,1,0,0],
 ];
+// Theme-token palette — no raw hex
 const POOP_PALETTE: Record<number, string> = {
   0: 'transparent',
-  1: '#3B2A1A',
-  2: '#7B5C3A',
+  1: COLOR_POOP_DARK,
+  2: COLOR_POOP_LIGHT,
 };
 const POOP_CELL = 4;
 
@@ -88,19 +97,19 @@ function PoopGlyph(): React.ReactElement {
 }
 
 const poopStyles = StyleSheet.create({
-  container: { marginHorizontal: 2 },
+  container: { marginHorizontal: SPACE_1 },  // was: 2 — now from token
   row:       { flexDirection: 'row' },
   cell:      { width: POOP_CELL, height: POOP_CELL },
 });
 
 // ─── Loading Splash ──────────────────────────────────────────────────────────
+// Shows the egg sprite with its bob animation and a pulsing "HATCHING" label.
 
 function LoadingSplash(): React.ReactElement {
   return (
-    <View style={splashStyles.container} accessible accessibilityLabel="Loading">
-      <PixelText variant="lg" color={LCD_DARK}>
-        . . .
-      </PixelText>
+    <View style={splashStyles.container} accessible accessibilityLabel="Loading, hatching">
+      {/* Egg sprite with its natural bob animation (no runtime deps needed) */}
+      <PetSprite stage="egg" mood="neutral" />
       <PixelText variant="sm" color={LCD_SHADE2} style={splashStyles.sub}>
         HATCHING
       </PixelText>
@@ -120,27 +129,61 @@ const splashStyles = StyleSheet.create({
   },
 });
 
+// ─── Critical Attention Indicator ────────────────────────────────────────────
+// Blinking "!" pixel indicator shown when any stat is at critical level.
+
+function CriticalIndicator(): React.ReactElement {
+  const [blinkAnim] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.timing(blinkAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [blinkAnim]);
+
+  return (
+    <Animated.View style={[critStyles.badge, { opacity: blinkAnim }]}>
+      <PixelText variant="sm" color={LCD_BG}>!</PixelText>
+    </Animated.View>
+  );
+}
+
+const critStyles = StyleSheet.create({
+  badge: {
+    backgroundColor: COLOR_CRITICAL,
+    paddingHorizontal: SPACE_2,
+    paddingVertical:   PIXEL,
+    marginLeft:        SPACE_4,
+  },
+});
+
 // ─── Death Overlay ───────────────────────────────────────────────────────────
 
 interface DeathOverlayProps {
-  cause:   CauseOfDeath;
+  stage:     import('../game/types').LifeStage;
+  cause:     CauseOfDeath;
   onRestart: () => void;
 }
 
-function DeathOverlay({ cause, onRestart }: DeathOverlayProps): React.ReactElement {
+function DeathOverlay({ stage, cause, onRestart }: DeathOverlayProps): React.ReactElement {
   return (
     <View style={deathStyles.overlay} accessible accessibilityLabel="Your pet has died">
+      {/* Ghost sprite is the emotional hero */}
+      <View style={deathStyles.ghostContainer}>
+        <PetSprite stage={stage} mood="dead" />
+      </View>
+
       <PixelText variant="md" color={LCD_DARK} style={deathStyles.title}>
         R.I.P.
       </PixelText>
       <PixelText variant="sm" color={LCD_SHADE2} style={deathStyles.cause}>
         CAUSE: {causeOfDeathLabel(cause)}
       </PixelText>
-
-      {/* Ghost tombstone indicator */}
-      <View style={deathStyles.tombstone}>
-        <PixelText variant="md" color={LCD_SHADE2}>RIP</PixelText>
-      </View>
 
       <View style={deathStyles.buttonRow}>
         <PixelButton
@@ -156,25 +199,20 @@ function DeathOverlay({ cause, onRestart }: DeathOverlayProps): React.ReactEleme
 const deathStyles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor:  'rgba(15,56,15,0.88)',
+    backgroundColor:  COLOR_OVERLAY,   // semantic token — no raw rgba hex
     alignItems:       'center',
     justifyContent:   'center',
     zIndex:           10,
     padding:          SPACE_12,
+  },
+  ghostContainer: {
+    marginBottom: SPACE_8,
   },
   title: {
     marginBottom: SPACE_6,
   },
   cause: {
     marginBottom: SPACE_8,
-  },
-  tombstone: {
-    borderWidth:     BORDER_WIDTH,
-    borderColor:     LCD_DARK,
-    paddingVertical: SPACE_4,
-    paddingHorizontal: SPACE_8,
-    marginBottom:    SPACE_12,
-    backgroundColor: LCD_BG,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -194,9 +232,26 @@ export function HomeScreen(): React.ReactElement {
   const handleRestart      = useCallback(() => actions.restart(),      [actions]);
 
   const isSleepingOrDead   = pet.isSleeping || pet.isDead;
+
+  // CLEAN is enabled whenever there are poops or hygiene is degraded
   const canClean           = pet.poops > 0 || pet.stats.hygiene < 100;
-  const canHeal            = pet.isSick;
+
+  // HEAL requires pet to be sick AND poops must be below overflow threshold
+  // (poop overflow sickness clears after CLEAN→HEAL sequence)
+  const canHeal            = pet.isSick && pet.poops <= POOP_OVERFLOW_THRESHOLD;
+
   const sleepLabel         = pet.isSleeping ? 'WAKE' : 'SLEEP';
+  // When waking, show a distinct glyph (not the sleep "z")
+  const sleepGlyph         = pet.isSleeping ? '!' : 'Z';
+
+  // Critical attention: any stat at or below threshold
+  const stats = pet.stats;
+  const isCritical =
+    stats.hunger    <= STAT_CRITICAL_THRESHOLD ||
+    stats.happiness <= STAT_CRITICAL_THRESHOLD ||
+    stats.energy    <= STAT_CRITICAL_THRESHOLD ||
+    stats.hygiene   <= STAT_CRITICAL_THRESHOLD ||
+    stats.health    <= STAT_CRITICAL_THRESHOLD;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -210,16 +265,19 @@ export function HomeScreen(): React.ReactElement {
             <LoadingSplash />
           ) : (
             <View style={styles.screenContent}>
-              {/* ── Top Row: name / stage / age ── */}
+              {/* ── Top Row: name / stage / age / critical indicator ── */}
               <View style={styles.topRow}>
-                <PixelText
-                  variant="sm"
-                  color={LCD_DARK}
-                  style={styles.petName}
-                  numberOfLines={1}
-                >
-                  {pet.name.toUpperCase()}
-                </PixelText>
+                <View style={styles.topLeft}>
+                  <PixelText
+                    variant="sm"
+                    color={LCD_DARK}
+                    style={styles.petName}
+                    numberOfLines={1}
+                  >
+                    {pet.name.toUpperCase()}
+                  </PixelText>
+                  {isCritical && !pet.isDead && <CriticalIndicator />}
+                </View>
                 <PixelText variant="tiny" color={LCD_SHADE2}>
                   {pet.stage.toUpperCase()} {formatAge(pet.ageSeconds)}
                 </PixelText>
@@ -265,7 +323,7 @@ export function HomeScreen(): React.ReactElement {
                   />
                   <PixelButton
                     label="PLAY"
-                    glyph="+"
+                    glyph=">"
                     onPress={handlePlay}
                     disabled={isSleepingOrDead}
                     accessibilityLabel="Play with your pet"
@@ -274,7 +332,7 @@ export function HomeScreen(): React.ReactElement {
                 <View style={styles.buttonRow}>
                   <PixelButton
                     label={sleepLabel}
-                    glyph="z"
+                    glyph={sleepGlyph}
                     onPress={handleToggleSleep}
                     disabled={pet.isDead}
                     accessibilityLabel={pet.isSleeping ? 'Wake your pet' : 'Put your pet to sleep'}
@@ -299,6 +357,7 @@ export function HomeScreen(): React.ReactElement {
               {/* ── Death Overlay ── */}
               {pet.isDead && (
                 <DeathOverlay
+                  stage={pet.stage}
                   cause={pet.causeOfDeath}
                   onRestart={handleRestart}
                 />
@@ -332,6 +391,10 @@ const styles = StyleSheet.create({
     paddingBottom:   SPACE_2,
     borderBottomWidth: BORDER_WIDTH,
     borderBottomColor: LCD_SHADE2,
+  },
+  topLeft: {
+    flexDirection: 'row',
+    alignItems:    'center',
   },
   petName: {
     maxWidth: 120,

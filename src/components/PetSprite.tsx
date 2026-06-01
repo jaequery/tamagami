@@ -8,8 +8,9 @@
  *   2 = mid (LCD_SHADE2)
  *   3 = light (LCD_SHADE1)
  *   4 = white highlight (#FFFFFF)
- *   5 = warning / sick color
+ *   5 = warning / sick color (COLOR_WARNING orange)
  *   6 = shell accent (device teal highlight)
+ *   7 = tear (COLOR_TEAR = LCD_SHADE2 dark-green, distinct from sick orange)
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated, AccessibilityInfo, StyleSheet } from 'react-native';
@@ -20,6 +21,7 @@ import {
   LCD_SHADE2,
   LCD_SHADE1,
   COLOR_WARNING,
+  COLOR_TEAR,
   SHELL_LIGHT,
   CELL_SIZE,
 } from '../theme';
@@ -33,6 +35,7 @@ const PALETTE: Record<number, string> = {
   4: '#FFFFFF',
   5: COLOR_WARNING,
   6: SHELL_LIGHT,
+  7: COLOR_TEAR,   // dark-green tear — reads as sad, not sick
 };
 
 // ─── Sprite Data ──────────────────────────────────────────────────────────
@@ -94,6 +97,7 @@ const SPRITE_BABY_HAPPY: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
+// SAD: clear inverted-U frown (corners up, center down) + dark-green tear (index 7)
 const SPRITE_BABY_SAD: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
@@ -101,16 +105,17 @@ const SPRITE_BABY_SAD: SpriteMatrix = [
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
   [0,0,3,2,1,2,2,1,2,2,3,0,0,0],
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
+  [0,0,3,2,1,2,2,2,1,2,3,0,0,0], // frown corners up
+  [0,0,3,2,2,1,1,1,2,2,3,0,0,0], // frown base down
   [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
   [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,0,0,5,0,0,0,0,0,0,0,0], // tear drop
+  [0,0,0,0,0,7,0,0,0,0,0,0,0,0], // dark-green tear
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
+// SICK: x-eyes, orange squiggles at mouth corners, orange sick spots near head
 const SPRITE_BABY_SICK: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
@@ -180,6 +185,7 @@ const SPRITE_CHILD_HAPPY: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
+// SAD: inverted-U frown + dark-green tear (index 7)
 const SPRITE_CHILD_SAD: SpriteMatrix = [
   [0,1,1,0,0,0,0,0,0,0,1,1,0,0],
   [1,2,2,1,0,0,0,0,0,1,2,2,1,0],
@@ -188,11 +194,11 @@ const SPRITE_CHILD_SAD: SpriteMatrix = [
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
   [0,0,3,2,1,2,2,1,2,2,3,0,0,0],
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
+  [0,0,3,2,1,2,2,2,1,2,3,0,0,0], // frown corners up
+  [0,0,3,2,2,1,1,1,2,2,3,0,0,0], // frown base down
   [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
   [0,0,0,0,3,3,2,2,3,3,0,0,0,0],
-  [0,0,0,5,3,0,0,0,0,3,0,0,0,0], // tear
+  [0,0,0,7,3,0,0,0,0,3,0,0,0,0], // dark-green tear
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
@@ -266,6 +272,7 @@ const SPRITE_TEEN_HAPPY: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
+// SAD: inverted-U frown + dark-green tear (index 7)
 const SPRITE_TEEN_SAD: SpriteMatrix = [
   [0,0,0,0,0,1,0,1,0,0,0,0,0,0],
   [0,0,0,0,1,2,1,2,1,0,0,0,0,0],
@@ -274,11 +281,11 @@ const SPRITE_TEEN_SAD: SpriteMatrix = [
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
   [0,0,3,2,2,1,2,1,2,2,3,0,0,0],
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,2,1,2,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
+  [0,0,3,2,1,2,2,2,1,2,3,0,0,0], // frown corners up
+  [0,0,3,2,2,1,1,1,2,2,3,0,0,0], // frown base down
   [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
   [0,0,3,2,0,3,3,3,0,2,3,0,0,0],
-  [0,5,3,2,0,0,0,0,0,2,3,0,0,0], // tear
+  [0,7,3,2,0,0,0,0,0,2,3,0,0,0], // dark-green tear
   [0,0,0,1,3,2,2,2,3,1,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
@@ -352,6 +359,7 @@ const SPRITE_ADULT_HAPPY: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
+// SAD: clear inverted-U frown + dark-green tear (index 7)
 const SPRITE_ADULT_SAD: SpriteMatrix = [
   [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
   [0,0,1,2,2,2,2,2,2,2,2,1,0,0],
@@ -359,11 +367,11 @@ const SPRITE_ADULT_SAD: SpriteMatrix = [
   [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
   [1,2,2,2,1,2,2,2,1,2,2,2,2,1],
   [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,2,2,1,1,1,2,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
+  [1,2,2,2,1,2,2,2,1,2,2,2,2,1], // frown corners up
+  [1,2,2,2,2,1,1,1,2,2,2,2,2,1], // frown base down
   [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
   [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,5,1,2,3,2,2,2,2,3,2,1,0,0], // tear
+  [0,7,1,2,3,2,2,2,2,3,2,1,0,0], // dark-green tear
   [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
   [0,0,0,1,1,1,0,0,1,1,1,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -488,13 +496,12 @@ interface PetSpriteProps {
 
 export function PetSprite({ stage, mood }: PetSpriteProps): React.ReactElement {
   const sprite      = getSprite(stage, mood);
-  // Lazy useState (not useRef.current) so the Animated.Value is created once
-  // without reading a ref during render.
   const [translateY] = useState(() => new Animated.Value(0));
   const animRef     = useRef<Animated.CompositeAnimation | null>(null);
 
-  const isAlive   = mood !== 'dead' && mood !== 'sleeping';
-  const isEgg     = stage === 'egg';
+  const isDead     = mood === 'dead';
+  const isSleeping = mood === 'sleeping';
+  const isEgg      = stage === 'egg';
 
   useEffect(() => {
     let reducedMotion = false;
@@ -503,40 +510,66 @@ export function PetSprite({ stage, mood }: PetSpriteProps): React.ReactElement {
       .then((enabled) => { reducedMotion = enabled; })
       .catch(() => undefined)
       .finally(() => {
-        if (!isAlive || reducedMotion) {
+        // Dead stays frozen; reduced-motion respected for everything else.
+        if (isDead || reducedMotion) {
           translateY.setValue(0);
           return;
         }
 
-        animRef.current = Animated.loop(
-          Animated.sequence([
-            Animated.timing(translateY, {
-              toValue:         isEgg ? -3 : -4,
-              duration:        600,
-              useNativeDriver: true,
-            }),
-            Animated.timing(translateY, {
-              toValue:         0,
-              duration:        600,
-              useNativeDriver: true,
-            }),
-          ]),
-        );
+        if (isSleeping) {
+          // Sleeping: slow gentle sway so it reads as resting, not suspended
+          animRef.current = Animated.loop(
+            Animated.sequence([
+              Animated.timing(translateY, {
+                toValue:         -2,
+                duration:        1200,
+                useNativeDriver: true,
+              }),
+              Animated.timing(translateY, {
+                toValue:         0,
+                duration:        1200,
+                useNativeDriver: true,
+              }),
+            ]),
+          );
+        } else {
+          // Alive: regular bob
+          animRef.current = Animated.loop(
+            Animated.sequence([
+              Animated.timing(translateY, {
+                toValue:         isEgg ? -3 : -4,
+                duration:        600,
+                useNativeDriver: true,
+              }),
+              Animated.timing(translateY, {
+                toValue:         0,
+                duration:        600,
+                useNativeDriver: true,
+              }),
+            ]),
+          );
+        }
         animRef.current.start();
       });
 
     return () => {
       animRef.current?.stop();
     };
-  }, [isAlive, isEgg, translateY]);
+  }, [isDead, isSleeping, isEgg, translateY]);
 
-  const accessMood = mood === 'dead' ? 'ghost' : `${mood} ${stage}`;
+  // Egg has no mood variants — hard-code accessibility label per spec #12
+  const accessLabel =
+    stage === 'egg'
+      ? 'egg, hatching'
+      : mood === 'dead'
+      ? 'Pet sprite: ghost'
+      : `Pet sprite: ${mood} ${stage}`;
 
   return (
     <Animated.View
       style={[styles.container, { transform: [{ translateY }] }]}
       accessible
-      accessibilityLabel={`Pet sprite: ${accessMood}`}
+      accessibilityLabel={accessLabel}
     >
       {sprite.map((row, rowIdx) => (
         <View key={rowIdx} style={styles.row}>
@@ -560,7 +593,7 @@ export function PetSprite({ stage, mood }: PetSpriteProps): React.ReactElement {
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'flex-start',
+    alignSelf: 'center',  // center the sprite block in its parent
   },
   row: {
     flexDirection: 'row',

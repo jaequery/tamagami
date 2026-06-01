@@ -11,7 +11,9 @@ import {
   toggleSleep,
 } from './engine';
 import {
+  HUNGER_CRITICAL_THRESHOLD,
   MAX_CATCHUP_SECONDS,
+  POOP_OVERFLOW_THRESHOLD,
   STAGE_BABY_TO_CHILD_SECONDS,
   STAGE_EGG_HATCH_SECONDS,
 } from './constants';
@@ -39,6 +41,54 @@ describe('createInitialPet', () => {
     expect(pet.causeOfDeath).toBeNull();
     expect(pet.stats.health).toBe(100);
     expect(pet.name).toBe('Pixel');
+  });
+});
+
+// ─── Name sanitization ───────────────────────────────────────────────────────
+
+describe('name sanitization', () => {
+  it('trims whitespace', () => {
+    const pet = createInitialPet('  Pixel  ', NOW);
+    expect(pet.name).toBe('Pixel');
+  });
+
+  it('clamps to 20 characters', () => {
+    const longName = 'A'.repeat(30);
+    const pet = createInitialPet(longName, NOW);
+    expect(pet.name.length).toBe(20);
+  });
+
+  it('strips control characters', () => {
+    const pet = createInitialPet('Pixel\x00\x1F\x7F', NOW);
+    expect(pet.name).toBe('Pixel');
+  });
+
+  it('falls back to Pixel for empty name', () => {
+    const pet = createInitialPet('', NOW);
+    expect(pet.name).toBe('Pixel');
+  });
+
+  it('falls back to Pixel for whitespace-only name', () => {
+    const pet = createInitialPet('   ', NOW);
+    expect(pet.name).toBe('Pixel');
+  });
+
+  it('rename sanitizes the new name', () => {
+    const pet = freshPet();
+    const next = rename(pet, '  Tama\x00  ');
+    expect(next.name).toBe('Tama');
+  });
+
+  it('restart sanitizes the provided name', () => {
+    const pet = freshPet({ isDead: true });
+    const next = restart(pet, NOW, '  NewPet\x1F  ');
+    expect(next.name).toBe('NewPet');
+  });
+
+  it('restart falls back to Pixel for blank name', () => {
+    const pet = freshPet({ isDead: true });
+    const next = restart(pet, NOW, '   ');
+    expect(next.name).toBe('Pixel');
   });
 });
 
@@ -254,6 +304,92 @@ describe('heal', () => {
     // health might regen slightly from simulate, but no explicit HEAL boost
     expect(next.stats.health).toBeLessThanOrEqual(80 + 1); // only regen from simulate which is < 1s
   });
+
+  it('heal() instant-cures sickness caused by poops even before poops are cleaned', () => {
+    // Pet is sick because poops > POOP_OVERFLOW_THRESHOLD
+    const pet = freshPet({
+      stage: 'adult',
+      isSick: true,
+      poops: POOP_OVERFLOW_THRESHOLD + 1,
+      stats: { hunger: 60, happiness: 60, energy: 60, hygiene: 30, health: 60 },
+    });
+    const next = heal(pet, NOW);
+    // simulate() inside heal() will re-trigger isSick because poops are still there,
+    // so the simulated state has isSick=true and heal() should then cure it.
+    // But note: simulate fires first and re-sets isSick=true, then heal() cures it.
+    expect(next.isSick).toBe(false);
+    expect(next.stats.health).toBeGreaterThan(60);
+  });
+
+  it('heal() boosts health stat', () => {
+    const pet = freshPet({
+      stage: 'adult',
+      isSick: true,
+      poops: 0,
+      stats: { hunger: 50, happiness: 50, energy: 50, hygiene: 50, health: 40 },
+    });
+    const healed = heal(pet, NOW);
+    expect(healed.stats.health).toBeGreaterThan(40);
+  });
+});
+
+// ─── Sickness recovery flow ───────────────────────────────────────────────────
+// Fix #3: gameplay rule tests for sickness onset / natural recovery / heal
+
+describe('sickness recovery flow', () => {
+  it('pet becomes sick when poops exceed POOP_OVERFLOW_THRESHOLD', () => {
+    const pet = freshPet({
+      stage: 'adult',
+      poops: POOP_OVERFLOW_THRESHOLD + 1,
+      stats: { hunger: 60, happiness: 60, energy: 60, hygiene: 50, health: 100 },
+    });
+    // A tiny advance triggers simulate with the overflow poops already set
+    const next = advanceSeconds(pet, 1);
+    expect(next.isSick).toBe(true);
+  });
+
+  it('pet stays sick while poop overflow persists', () => {
+    const pet = freshPet({
+      stage: 'adult',
+      isSick: true,
+      poops: POOP_OVERFLOW_THRESHOLD + 1,
+      stats: { hunger: 60, happiness: 60, energy: 60, hygiene: 40, health: 80 },
+    });
+    const next = advanceSeconds(pet, 60);
+    expect(next.isSick).toBe(true);
+  });
+
+  it('pet recovers naturally on next tick after clean() removes the poop cause', () => {
+    // Set up a pet that is sick due to poop overflow; hygiene is restored by clean()
+    const sick = freshPet({
+      stage: 'adult',
+      isSick: true,
+      poops: POOP_OVERFLOW_THRESHOLD + 1,
+      stats: { hunger: 60, happiness: 60, energy: 60, hygiene: 10, health: 70 },
+    });
+    // clean() resets poops to 0 and hygiene to 100
+    const cleaned = clean(sick, NOW);
+    expect(cleaned.poops).toBe(0);
+    expect(cleaned.stats.hygiene).toBe(100);
+    // On the next simulated tick (1 second later), no sickness causes remain →
+    // isSick should clear naturally
+    const recovered = advanceSeconds(cleaned, 1);
+    expect(recovered.isSick).toBe(false);
+  });
+
+  it('heal() provides instant cure + health bump regardless of remaining causes', () => {
+    // Pet is sick with poops still present (causes not yet resolved)
+    // simulate() inside heal() re-triggers isSick; then heal() clears it immediately
+    const sick = freshPet({
+      stage: 'adult',
+      isSick: true,
+      poops: POOP_OVERFLOW_THRESHOLD + 1,
+      stats: { hunger: 60, happiness: 60, energy: 60, hygiene: 20, health: 50 },
+    });
+    const healed = heal(sick, NOW);
+    expect(healed.isSick).toBe(false);
+    expect(healed.stats.health).toBeGreaterThan(50);
+  });
 });
 
 // ─── SLEEP toggle ─────────────────────────────────────────────────────────────
@@ -300,7 +436,7 @@ describe('neglect path', () => {
     expect(advanced.isDead).toBe(true);
   });
 
-  it('causeOfDeath is starvation when hunger drove the death', () => {
+  it('causeOfDeath is starvation when hunger drove the death (hunger === 0)', () => {
     const pet = freshPet({
       stage: 'adult',
       isSick: true,
@@ -311,11 +447,31 @@ describe('neglect path', () => {
     expect(advanced.causeOfDeath).toBe('starvation');
   });
 
-  it('causeOfDeath is sickness when sick with ok hunger', () => {
+  it('causeOfDeath is starvation when hunger is low but nonzero (≤ HUNGER_CRITICAL_THRESHOLD)', () => {
+    // Fix #4: near-starvation deaths should be 'starvation', not 'neglect'
+    const pet = freshPet({
+      stage: 'adult',
+      isSick: false,
+      stats: {
+        hunger: HUNGER_CRITICAL_THRESHOLD,
+        happiness: 60,
+        energy: 60,
+        hygiene: 60,
+        health: 1,
+      },
+    });
+    const advanced = advanceSeconds(pet, 600);
+    expect(advanced.isDead).toBe(true);
+    expect(advanced.causeOfDeath).toBe('starvation');
+  });
+
+  it('causeOfDeath is sickness when sick with ok hunger (cause kept via low hygiene)', () => {
+    // Keep a sickness cause alive (hygiene = 0) so isSick stays true throughout.
+    // hunger is well above HUNGER_CRITICAL_THRESHOLD so starvation is ruled out.
     const pet = freshPet({
       stage: 'adult',
       isSick: true,
-      stats: { hunger: 60, happiness: 60, energy: 60, hygiene: 60, health: 1 },
+      stats: { hunger: 60, happiness: 60, energy: 60, hygiene: 0, health: 1 },
     });
     const advanced = advanceSeconds(pet, 600);
     expect(advanced.isDead).toBe(true);

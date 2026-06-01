@@ -5,8 +5,12 @@ import type { PetState } from './types';
 // Identifier prefix for care notifications so we can batch-cancel them
 const CARE_NOTIFICATION_PREFIX = 'tama-care-';
 
-// Track whether permission was granted so we avoid re-requesting every call
+// Track whether permission was granted so we avoid re-requesting every call.
+// May be stale after a mid-session grant; refreshed lazily in rescheduleCareNotifications.
 let _permissionGranted = false;
+
+// In-flight guard to prevent concurrent cancel/schedule interleaving
+let _rescheduling = false;
 
 export async function initNotifications(): Promise<boolean> {
   try {
@@ -36,8 +40,26 @@ export async function initNotifications(): Promise<boolean> {
 }
 
 export async function rescheduleCareNotifications(state: PetState): Promise<void> {
+  // Serialize: skip if a reschedule is already in progress
+  if (_rescheduling) return;
+  _rescheduling = true;
+
   try {
-    if (!_permissionGranted || state.isDead) return;
+    if (state.isDead) return;
+
+    // Fix #9: if the cached flag is false, re-query to handle mid-session grants
+    // or the fast-resume race before initNotifications completes.
+    if (!_permissionGranted) {
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        _permissionGranted = status === 'granted';
+      } catch {
+        // getPermissionsAsync failed — keep existing flag, bail gracefully
+        return;
+      }
+    }
+
+    if (!_permissionGranted) return;
 
     // Cancel all previously scheduled care notifications
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -71,5 +93,7 @@ export async function rescheduleCareNotifications(state: PetState): Promise<void
     await Promise.all(schedulePromises);
   } catch {
     // Silently ignore — notifications are best-effort
+  } finally {
+    _rescheduling = false;
   }
 }

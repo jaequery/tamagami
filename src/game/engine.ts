@@ -41,12 +41,20 @@ function clamp(value: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, value));
 }
 
+/** Strip non-printable / control characters, trim whitespace, clamp to 20 chars.
+ *  Falls back to 'Pixel' for empty / whitespace-only input. */
+function sanitizeName(raw: string): string {
+  // Remove control characters (U+0000–U+001F, U+007F–U+009F)
+  const stripped = raw.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim().slice(0, 20);
+  return stripped.length > 0 ? stripped : 'Pixel';
+}
+
 // ─── Initial state ────────────────────────────────────────────────────────────
 
 export function createInitialPet(name: string, now: number): PetState {
   return {
     version: CURRENT_VERSION,
-    name,
+    name: sanitizeName(name),
     bornAt: now,
     lastTick: now,
     stats: {
@@ -74,6 +82,24 @@ function resolveStage(ageSeconds: number): LifeStage {
   if (ageSeconds < STAGE_CHILD_TO_TEEN_SECONDS) return 'child';
   if (ageSeconds < STAGE_TEEN_TO_ADULT_SECONDS) return 'teen';
   return 'adult';
+}
+
+// ─── Sickness cause check ─────────────────────────────────────────────────────
+
+/**
+ * Returns true while at least one cause for sickness is still present.
+ * Used by simulate() to both SET and CLEAR isSick based on current stat values.
+ *
+ * Gameplay rule (for UI agent alignment):
+ *  - Sickness triggers on: hunger === 0 OR hygiene === 0 OR poops > POOP_OVERFLOW_THRESHOLD
+ *  - Sickness CLEARS automatically on the next tick once ALL causes are resolved
+ *    (hunger > 0, hygiene > 0, poops <= POOP_OVERFLOW_THRESHOLD).
+ *  - heal() provides an INSTANT cure regardless of cause state, plus a health bump.
+ *  - Net effect: clean() clears poop-driven sickness on the next tick; heal()
+ *    clears it immediately and restores health.
+ */
+function hasSicknessCause(hunger: number, hygiene: number, poops: number): boolean {
+  return hunger === 0 || hygiene === 0 || poops > POOP_OVERFLOW_THRESHOLD;
 }
 
 // ─── simulate ────────────────────────────────────────────────────────────────
@@ -134,11 +160,16 @@ export function simulate(state: PetState, now: number): PetState {
   energy = clamp(energy);
   hygiene = clamp(hygiene);
 
-  // ── Sickness onset ────────────────────────────────────────────────────────
-  if (!isSick) {
-    if (hunger === 0 || hygiene === 0 || poops > POOP_OVERFLOW_THRESHOLD) {
-      isSick = true;
-    }
+  // ── Sickness onset / recovery ─────────────────────────────────────────────
+  // isSick is SET when a cause appears AND CLEARED when all causes are resolved.
+  // heal() provides instant cure outside simulate(); this rule keeps the
+  // simulation coherent so clean() alone resolves poop-driven sickness.
+  if (hasSicknessCause(hunger, hygiene, poops)) {
+    isSick = true;
+  } else {
+    // All causes resolved — allow natural recovery (isSick → false).
+    // heal() can still be used for an instant cure + health bump.
+    isSick = false;
   }
 
   // ── Health changes ────────────────────────────────────────────────────────
@@ -146,22 +177,16 @@ export function simulate(state: PetState, now: number): PetState {
     health -= HEALTH_DECAY_SICK_PER_SECOND * elapsed;
   } else if (hunger <= HUNGER_CRITICAL_THRESHOLD) {
     health -= HEALTH_DECAY_CRITICAL_HUNGER_PER_SECOND * elapsed;
-  } else if (!isSick && hunger > HUNGER_CRITICAL_THRESHOLD && hygiene > 0 && happiness > 0) {
+  } else if (hunger > HUNGER_CRITICAL_THRESHOLD && hygiene > 0 && happiness > 0) {
     // All needs reasonably satisfied — slow regen
     health += HEALTH_REGEN_PER_SECOND * elapsed;
   }
   health = clamp(health);
 
-  // ── Sickness recovery (needs satisfied + not triggered this tick) ─────────
-  if (isSick && hunger > HUNGER_CRITICAL_THRESHOLD && hygiene > 20 && poops <= POOP_OVERFLOW_THRESHOLD) {
-    // Natural recovery is NOT possible — requires heal() action
-    // isSick remains true until heal() is called
-  }
-
   // ── Death ─────────────────────────────────────────────────────────────────
   if (health === 0 && !isDead) {
     isDead = true;
-    if (hunger === 0) {
+    if (hunger <= HUNGER_CRITICAL_THRESHOLD) {
       causeOfDeath = 'starvation';
     } else if (isSick) {
       causeOfDeath = 'sickness';
@@ -258,11 +283,11 @@ export function heal(state: PetState, now: number): PetState {
 }
 
 export function restart(state: PetState, now: number, name?: string): PetState {
-  return createInitialPet(name ?? state.name, now);
+  return createInitialPet(sanitizeName(name ?? state.name), now);
 }
 
 export function rename(state: PetState, name: string): PetState {
-  return { ...state, name };
+  return { ...state, name: sanitizeName(name) };
 }
 
 // ─── Mood ─────────────────────────────────────────────────────────────────────
@@ -331,7 +356,13 @@ export function nextStageAt(state: PetState): NotificationProjection[] {
     projections.push({ stat: 'energy', label: `${state.name} is exhausted! 💤`, triggerAtMs: energyCross });
   }
 
-  const hygieneCross = projectCrossTime(hygiene, NOTIFY_HYGIENE_THRESHOLD, HYGIENE_DECAY_PER_SECOND, now);
+  // Fix #5: effective hygiene rate includes poop drain so notification fires before threshold.
+  const effectiveHygieneRate =
+    HYGIENE_DECAY_PER_SECOND +
+    HYGIENE_DRAIN_PER_POOP_PER_SECOND * state.poops +
+    (state.poops >= POOP_OVERFLOW_THRESHOLD ? HYGIENE_OVERFLOW_DRAIN_PER_SECOND : 0);
+
+  const hygieneCross = projectCrossTime(hygiene, NOTIFY_HYGIENE_THRESHOLD, effectiveHygieneRate, now);
   if (hygieneCross !== null) {
     projections.push({ stat: 'hygiene', label: `${state.name} needs a bath! 🛁`, triggerAtMs: hygieneCross });
   }
