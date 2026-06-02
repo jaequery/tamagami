@@ -7,7 +7,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tamagotcha.app",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.tamagotcha.app"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -30,7 +34,8 @@
           "color": "#ffffff",
           "iosDisplayInForeground": true
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ]
   }
 }

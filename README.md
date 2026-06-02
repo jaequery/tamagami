@@ -39,6 +39,31 @@ npm start        # then scan the QR code with Expo Go on a physical iPhone
 > Local notifications and haptics behave best on a **physical device** / a
 > development build. In Expo Go some notification features are limited.
 
+## 📲 Home-screen & lock-screen widget
+
+There's a native **WidgetKit** widget (Small + Medium home-screen, plus iOS-16+
+lock-screen accessory) that shows the pet and its stats — and keeps the needs
+**ticking down on a projected timeline even while the app is closed**, because
+the decay simulation is ported to Swift (`targets/widget/Engine.swift`) and runs
+inside the widget. The app mirrors pet state into a shared **App Group** on every
+save (`src/game/widget.ts`), and the widget reads + projects it.
+
+Because widgets are native, the app uses Expo's prebuild (Continuous Native
+Generation). The generated `ios/` folder is **gitignored** — regenerate it any
+time with:
+
+```bash
+npx expo prebuild --platform ios   # generates ios/ + the widget target + pods
+npm run ios                         # build & run app + widget on the simulator
+```
+
+To build to a **physical device** (and for the App Group to work there), add your
+Apple Team ID to `app.json` under `expo.ios.appleTeamId`, then open
+`ios/tamagotcha.xcworkspace` in Xcode and run. The widget's Swift lives in
+`targets/widget/` (it is the source of truth — `@bacons/apple-targets` wires it
+into the Xcode project on every prebuild); the App Group is
+`group.com.tamagotcha.app`.
+
 ## Quality checks
 
 ```bash

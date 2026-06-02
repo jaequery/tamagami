@@ -14,6 +14,7 @@ import {
 } from '../game/engine';
 import { initNotifications, rescheduleCareNotifications } from '../game/notifications';
 import { loadPet, savePet } from '../game/storage';
+import { syncWidget } from '../game/widget';
 import type { PetActions, PetState, UsePet } from '../game/types';
 
 const TICK_INTERVAL_MS = 1000;
@@ -40,6 +41,9 @@ export function usePet(): UsePet {
     lastPersistRef.current = now;
     await savePet(state);
     await rescheduleCareNotifications(state);
+    // Mirror to the iOS widget; reload its timeline only on forced persists
+    // (user actions / backgrounding) to stay within WidgetKit's refresh budget.
+    syncWidget(state, force);
   }, []);
 
   // ── Apply state + persist ─────────────────────────────────────────────────
@@ -70,6 +74,7 @@ export function usePet(): UsePet {
 
       await savePet(simulated);
       await rescheduleCareNotifications(simulated);
+      syncWidget(simulated, true);
     }
 
     void bootstrap();
