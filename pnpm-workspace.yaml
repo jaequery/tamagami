@@ -1,3 +1,8 @@
+# Expo / React Native + pnpm: Metro can't traverse pnpm's symlinked store, so
+# install a flat (hoisted) node_modules like npm/yarn. pnpm 11 reads this from
+# pnpm-workspace.yaml (the .npmrc `node-linker` key is no longer honored here).
+nodeLinker: hoisted
+
 allowBuilds:
   msgpackr-extract: true
   unrs-resolver: true
