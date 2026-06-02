@@ -1,4 +1,4 @@
-# 🥚 Tamagotcha
+# 🥚 Tamagami
 
 A retro pixel-art virtual-pet iPhone app — feed it, play with it, clean up after
 it, and keep it alive. Built with Expo (React Native + TypeScript). The pet's
@@ -59,7 +59,7 @@ npm run ios                         # build & run app + widget on the simulator
 
 To build to a **physical device** (and for the App Group to work there), add your
 Apple Team ID to `app.json` under `expo.ios.appleTeamId`, then open
-`ios/tamagotcha.xcworkspace` in Xcode and run. The widget's Swift lives in
+`ios/tamagami.xcworkspace` in Xcode and run. The widget's Swift lives in
 `targets/widget/` (it is the source of truth — `@bacons/apple-targets` wires it
 into the Xcode project on every prebuild); the App Group is
 `group.com.tamagotcha.app`.

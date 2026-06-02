@@ -274,7 +274,7 @@ struct TamaWidget: Widget {
         StaticConfiguration(kind: kind, provider: TamaProvider()) { entry in
             TamaWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Tamagotcha")
+        .configurationDisplayName("Tamagami")
         .description("Watch your pet's needs decay in real time.")
         .supportedFamilies(TamaWidget.supportedFamilies)
     }

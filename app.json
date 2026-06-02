@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "tamagotcha",
-    "slug": "tamagotcha",
+    "name": "tamagami",
+    "slug": "tamagami",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

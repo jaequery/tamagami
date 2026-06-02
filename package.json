@@ -1,5 +1,5 @@
 {
-  "name": "tamagotcha",
+  "name": "tamagami",
   "version": "1.0.0",
   "main": "index.ts",
   "packageManager": "pnpm@11.2.2",
