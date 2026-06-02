@@ -31,7 +31,10 @@
     "web": "expo start --web",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "release": "npm run typecheck && npx eas-cli build --platform ios --profile production --auto-submit",
+    "release:build": "npx eas-cli build --platform ios --profile production",
+    "release:preview": "npx eas-cli build --platform ios --profile preview"
   },
   "jest": {
     "preset": "jest-expo",
