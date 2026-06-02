@@ -12,6 +12,9 @@
       "appleTeamId": "7BWUZV469T",
       "entitlements": {
         "com.apple.security.application-groups": ["group.com.tamagami.app"]
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -37,6 +40,28 @@
         }
       ],
       "@bacons/apple-targets"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.tamagami.app.widget",
+                  "targetName": "TamaWidget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.tamagami.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "8032ef3b-0b02-4f4b-af3e-8200012ea133"
+      }
+    }
   }
 }
