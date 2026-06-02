@@ -1,41 +1,50 @@
 // PetState.swift
 // Model types + shared-data loader for the TamaWidget extension.
-// Reads from App Group "group.com.tamagami.app", key "petState".
+// Mirrors src/game/types.ts. Reads from App Group "group.com.tamagami.app",
+// key "petState".
 
 import Foundation
 
 // MARK: - Types
 
-enum LifeStage: String, Codable {
-    case egg, baby, child, teen, adult
+enum PetType: String, Codable {
+    case plant, cat, dog
+
+    /// True for the feed + play archetypes.
+    var isAnimal: Bool { self == .cat || self == .dog }
+
+    /// Short uppercase label shown in the widget header.
+    var title: String {
+        switch self {
+        case .plant: return "PLANT"
+        case .cat:   return "CAT"
+        case .dog:   return "DOG"
+        }
+    }
 }
 
 enum Mood {
-    case happy, neutral, sad, sick, sleeping, dead
+    case happy, neutral, sad, dead
 }
 
 enum CauseOfDeath: String, Codable {
-    case starvation, sickness, neglect
+    case starvation, thirst, neglect
 }
 
 struct PetStats: Codable {
-    var hunger: Double
-    var happiness: Double
-    var energy: Double
-    var hygiene: Double
-    var health: Double
+    var hunger: Double     // cat/dog
+    var happiness: Double  // cat/dog
+    var health: Double     // cat/dog
+    var water: Double      // plant
 }
 
 struct PetState: Codable {
     var version: Int
+    var petType: PetType
     var name: String
     var bornAt: Double       // epoch ms
     var lastTick: Double     // epoch ms
     var stats: PetStats
-    var stage: LifeStage
-    var isSleeping: Bool
-    var isSick: Bool
-    var poops: Int
     var isDead: Bool
     var causeOfDeath: CauseOfDeath?
     var ageSeconds: Double
@@ -44,18 +53,15 @@ struct PetState: Codable {
 // MARK: - Default / fallback state
 
 extension PetState {
-    /// A freshly-hatched egg used as a fallback when no stored state is available.
-    static func defaultEgg(nowMs: Double = Date().timeIntervalSince1970 * 1000) -> PetState {
+    /// A freshly-created pet used as a fallback when no stored state is available.
+    static func defaultPet(nowMs: Double = Date().timeIntervalSince1970 * 1000) -> PetState {
         PetState(
-            version: 1,
+            version: 2,
+            petType: .cat,
             name: "Pixel",
             bornAt: nowMs,
             lastTick: nowMs,
-            stats: PetStats(hunger: 80, happiness: 80, energy: 100, hygiene: 100, health: 100),
-            stage: .egg,
-            isSleeping: false,
-            isSick: false,
-            poops: 0,
+            stats: PetStats(hunger: 80, happiness: 80, health: 100, water: 100),
             isDead: false,
             causeOfDeath: nil,
             ageSeconds: 0
@@ -70,21 +76,21 @@ struct PetStateLoader {
     static let key       = "petState"
 
     /// Reads, decodes, and returns the current pet state.
-    /// Falls back to `PetState.defaultEgg()` on any failure.
+    /// Falls back to `PetState.defaultPet()` on any failure.
     static func load() -> PetState {
         guard
             let suite  = UserDefaults(suiteName: suiteName),
             let json   = suite.string(forKey: key),
             let data   = json.data(using: .utf8)
         else {
-            return .defaultEgg()
+            return .defaultPet()
         }
 
         let decoder = JSONDecoder()
         do {
             return try decoder.decode(PetState.self, from: data)
         } catch {
-            return .defaultEgg()
+            return .defaultPet()
         }
     }
 }

@@ -21,7 +21,7 @@ struct TamaProvider: TimelineProvider {
     // MARK: Placeholder (shown while widget loads / in widget gallery)
     func placeholder(in context: Context) -> TamaEntry {
         let nowMs = Date().timeIntervalSince1970 * 1000
-        let state = PetState.defaultEgg(nowMs: nowMs)
+        let state = PetState.defaultPet(nowMs: nowMs)
         return TamaEntry(date: Date(), state: state, mood: getMood(state))
     }
 
