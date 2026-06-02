@@ -1,7 +1,10 @@
 /**
  * PetSprite — renders the pet as a 2D grid of colored <View> cells (real pixel art).
  *
- * Sprite matrices are 14×14 cells, rendered at CELL_SIZE pt each.
+ * Sprites are keyed by petType × mood. Each matrix is 14×14 cells, rendered at
+ * CELL_SIZE pt each. The Swift widget (targets/widget/Sprite.swift) mirrors these
+ * matrices verbatim — keep the two in sync.
+ *
  * Palette indices:
  *   0 = transparent (LCD_BG)
  *   1 = darkest (LCD_DARK)
@@ -14,7 +17,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated, AccessibilityInfo, StyleSheet } from 'react-native';
-import type { LifeStage, Mood } from '../game/types';
+import type { Mood, PetType } from '../game/types';
 import {
   LCD_BG,
   LCD_DARK,
@@ -35,123 +38,65 @@ const PALETTE: Record<number, string> = {
   4: '#FFFFFF',
   5: COLOR_WARNING,
   6: SHELL_LIGHT,
-  7: COLOR_TEAR,   // dark-green tear — reads as sad, not sick
+  7: COLOR_TEAR,
 };
-
-// ─── Sprite Data ──────────────────────────────────────────────────────────
-// Each sprite is a 14-row × 14-col grid of palette indices.
-// 0 = transparent background (see through to LCD_BG).
 
 type SpriteMatrix = number[][];
 
-// EGG — cute speckled oval
-const SPRITE_EGG: SpriteMatrix = [
-  [0,0,0,0,0,3,3,3,3,0,0,0,0,0],
-  [0,0,0,3,3,2,2,2,2,3,3,0,0,0],
-  [0,0,3,2,2,2,1,2,2,2,2,3,0,0],
-  [0,3,2,2,1,2,2,2,2,2,2,2,3,0],
-  [0,3,2,2,2,2,2,1,2,2,2,2,3,0],
-  [3,2,2,2,2,2,2,2,2,2,1,2,2,3],
-  [3,2,2,1,2,2,2,2,2,2,2,2,2,3],
-  [3,2,2,2,2,2,1,2,2,2,2,2,2,3],
-  [3,2,2,2,2,2,2,2,2,1,2,2,2,3],
-  [0,3,2,2,2,2,2,2,2,2,2,2,3,0],
-  [0,3,2,2,1,2,2,2,2,2,1,2,3,0],
-  [0,0,3,2,2,2,2,2,2,2,2,3,0,0],
-  [0,0,0,3,3,2,2,2,2,3,3,0,0,0],
-  [0,0,0,0,0,3,3,3,3,0,0,0,0,0],
+// ─── PLANT — a potted sprout with a face on the pot ──────────────────────────
+const SPRITE_PLANT_NEUTRAL: SpriteMatrix = [
+  [0,0,0,0,0,0,2,2,0,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,2,2,0,2,2,2,2,0,2,2,0,0],
+  [0,2,3,3,2,2,2,2,2,2,3,3,2,0],
+  [0,2,3,3,3,2,2,2,2,3,3,3,2,0],
+  [0,0,2,2,2,2,2,2,2,2,2,2,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
+  [0,0,0,1,3,3,3,3,3,3,1,0,0,0],
+  [0,0,0,1,3,1,3,3,1,3,1,0,0,0],
+  [0,0,0,1,3,3,1,1,3,3,1,0,0,0],
+  [0,0,0,0,1,3,3,3,3,1,0,0,0,0],
+  [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
 ];
 
-// BABY — tiny round blob with dot eyes and smile
-const SPRITE_BABY_NEUTRAL: SpriteMatrix = [
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,1,2,2,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+const SPRITE_PLANT_HAPPY: SpriteMatrix = [
+  [0,0,0,0,0,0,2,2,0,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,2,2,2,2,2,2,2,2,2,2,0,0],
+  [0,2,3,3,3,2,2,2,2,3,3,3,2,0],
+  [0,2,3,3,3,2,2,2,2,3,3,3,2,0],
+  [0,0,2,2,2,2,2,2,2,2,2,2,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
+  [0,0,0,1,3,3,3,3,3,3,1,0,0,0],
+  [0,0,0,1,3,1,3,3,1,3,1,0,0,0],
+  [0,0,0,1,3,1,3,3,1,3,1,0,0,0],
+  [0,0,0,0,1,1,3,3,1,1,0,0,0,0],
+  [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
 ];
 
-const SPRITE_BABY_HAPPY: SpriteMatrix = [
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,1,1,2,1,1,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,1,2,2,2,1,2,3,0,0,0],
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+const SPRITE_PLANT_SAD: SpriteMatrix = [
+  [0,0,0,0,0,0,2,2,0,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,2,2,0,0,2,2,2,2,0,0,2,2,0],
+  [2,3,3,2,0,2,2,2,2,0,2,3,3,2],
+  [0,2,2,2,0,2,2,2,2,0,2,2,2,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,0,0,0,2,2,2,2,0,0,0,0,0],
+  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
+  [0,0,0,1,3,3,3,3,3,3,1,0,0,0],
+  [0,0,0,1,3,1,3,3,1,3,1,0,0,0],
+  [0,0,0,1,3,3,1,1,3,3,1,0,0,0],
+  [0,0,7,0,1,3,3,3,3,1,0,0,0,0],
+  [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
 ];
 
-// SAD: clear inverted-U frown (corners up, center down) + dark-green tear (index 7)
-const SPRITE_BABY_SAD: SpriteMatrix = [
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,1,2,2,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,1,2,2,2,1,2,3,0,0,0], // frown corners up
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0], // frown base down
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,0,0,7,0,0,0,0,0,0,0,0], // dark-green tear
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-// SICK: x-eyes, orange squiggles at mouth corners, orange sick spots near head
-const SPRITE_BABY_SICK: SpriteMatrix = [
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,5,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,5,0],
-  [0,0,3,2,1,2,2,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,5,1,1,1,5,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const SPRITE_BABY_SLEEPING: SpriteMatrix = [
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,1,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,1,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,1,0],
-  [0,0,3,2,3,3,2,3,3,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,3,3,3,2,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-// CHILD — cat-like creature with ears and whiskers
-const SPRITE_CHILD_NEUTRAL: SpriteMatrix = [
+// ─── CAT — round head with pointed ears and whiskers ─────────────────────────
+const SPRITE_CAT_NEUTRAL: SpriteMatrix = [
   [0,1,1,0,0,0,0,0,0,0,1,1,0,0],
   [1,2,2,1,0,0,0,0,0,1,2,2,1,0],
   [1,2,2,1,3,3,3,3,3,1,2,2,1,0],
@@ -168,7 +113,7 @@ const SPRITE_CHILD_NEUTRAL: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
-const SPRITE_CHILD_HAPPY: SpriteMatrix = [
+const SPRITE_CAT_HAPPY: SpriteMatrix = [
   [0,1,1,0,0,0,0,0,0,0,1,1,0,0],
   [1,2,2,1,0,0,0,0,0,1,2,2,1,0],
   [1,2,2,1,3,3,3,3,3,1,2,2,1,0],
@@ -185,8 +130,7 @@ const SPRITE_CHILD_HAPPY: SpriteMatrix = [
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
-// SAD: inverted-U frown + dark-green tear (index 7)
-const SPRITE_CHILD_SAD: SpriteMatrix = [
+const SPRITE_CAT_SAD: SpriteMatrix = [
   [0,1,1,0,0,0,0,0,0,0,1,1,0,0],
   [1,2,2,1,0,0,0,0,0,1,2,2,1,0],
   [1,2,2,1,3,3,3,3,3,1,2,2,1,0],
@@ -194,224 +138,68 @@ const SPRITE_CHILD_SAD: SpriteMatrix = [
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
   [0,0,3,2,1,2,2,1,2,2,3,0,0,0],
   [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,1,2,2,2,1,2,3,0,0,0], // frown corners up
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0], // frown base down
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,2,2,3,3,0,0,0,0],
-  [0,0,0,7,3,0,0,0,0,3,0,0,0,0], // dark-green tear
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const SPRITE_CHILD_SICK: SpriteMatrix = [
-  [0,1,1,0,0,0,0,0,0,0,1,1,0,0],
-  [1,2,2,1,0,0,0,0,0,1,2,2,1,0],
-  [1,2,2,1,3,3,3,3,3,1,2,2,1,0],
-  [0,1,1,3,2,2,2,2,2,3,1,1,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,5,0,0],
-  [0,0,3,2,1,2,2,1,2,2,3,0,5,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,5,1,1,1,5,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,2,2,3,3,0,0,0,0],
-  [0,0,0,0,3,0,0,0,0,3,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const SPRITE_CHILD_SLEEPING: SpriteMatrix = [
-  [0,1,1,0,0,0,0,0,0,0,1,1,0,0],
-  [1,2,2,1,0,0,0,1,0,1,2,2,1,0],
-  [1,2,2,1,3,3,3,3,3,1,2,2,1,0],
-  [0,1,1,3,2,2,2,2,2,3,1,1,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,3,3,2,3,3,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,3,3,3,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,0,3,3,2,2,3,3,0,0,0,0],
-  [0,0,0,0,3,0,0,0,0,3,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-// TEEN — spiky punk with a tuft on top
-const SPRITE_TEEN_NEUTRAL: SpriteMatrix = [
-  [0,0,0,0,0,1,0,1,0,0,0,0,0,0],
-  [0,0,0,0,1,2,1,2,1,0,0,0,0,0],
-  [0,0,0,1,3,3,3,3,3,1,0,0,0,0],
-  [0,0,1,3,2,2,2,2,2,3,1,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,2,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,3,3,2,2,2,3,3,0,0,0,0],
-  [0,0,3,2,0,3,3,3,0,2,3,0,0,0],
-  [0,0,3,2,0,0,0,0,0,2,3,0,0,0],
-  [0,0,0,1,3,2,2,2,3,1,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const SPRITE_TEEN_HAPPY: SpriteMatrix = [
-  [0,0,0,0,0,1,0,1,0,0,0,0,0,0],
-  [0,0,0,0,1,2,1,2,1,0,0,0,0,0],
-  [0,0,0,1,3,3,3,3,3,1,0,0,0,0],
-  [0,0,1,3,2,2,2,2,2,3,1,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,1,1,1,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
   [0,0,3,2,1,2,2,2,1,2,3,0,0,0],
   [0,0,3,2,2,1,1,1,2,2,3,0,0,0],
   [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,3,2,0,3,3,3,0,2,3,0,0,0],
-  [0,0,3,2,0,0,0,0,0,2,3,0,0,0],
-  [0,0,0,1,3,2,2,2,3,1,0,0,0,0],
+  [0,0,0,0,3,3,2,2,3,3,0,0,0,0],
+  [0,0,0,7,3,0,0,0,0,3,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
-// SAD: inverted-U frown + dark-green tear (index 7)
-const SPRITE_TEEN_SAD: SpriteMatrix = [
-  [0,0,0,0,0,1,0,1,0,0,0,0,0,0],
-  [0,0,0,0,1,2,1,2,1,0,0,0,0,0],
-  [0,0,0,1,3,3,3,3,3,1,0,0,0,0],
-  [0,0,1,3,2,2,2,2,2,3,1,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,2,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,1,2,2,2,1,2,3,0,0,0], // frown corners up
-  [0,0,3,2,2,1,1,1,2,2,3,0,0,0], // frown base down
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,3,2,0,3,3,3,0,2,3,0,0,0],
-  [0,7,3,2,0,0,0,0,0,2,3,0,0,0], // dark-green tear
-  [0,0,0,1,3,2,2,2,3,1,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const SPRITE_TEEN_SICK: SpriteMatrix = [
-  [0,0,0,0,0,1,0,1,0,0,0,0,0,0],
-  [0,0,0,0,1,2,1,2,1,0,5,0,0,0],
-  [0,0,0,1,3,3,3,3,3,1,0,5,0,0],
-  [0,0,1,3,2,2,2,2,2,3,1,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,1,2,1,2,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,5,1,1,1,5,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,3,3,2,2,2,3,3,0,0,0,0],
-  [0,0,3,2,0,3,3,3,0,2,3,0,0,0],
-  [0,0,3,2,0,0,0,0,0,2,3,0,0,0],
-  [0,0,0,1,3,2,2,2,3,1,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const SPRITE_TEEN_SLEEPING: SpriteMatrix = [
-  [0,0,0,0,0,1,0,1,0,0,0,0,0,0],
-  [0,0,0,0,1,2,1,2,1,0,1,0,0,0],
-  [0,0,0,1,3,3,3,3,3,1,0,1,0,0],
-  [0,0,1,3,2,2,2,2,2,3,1,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,3,3,2,3,3,2,3,0,0,0],
-  [0,0,3,2,2,2,2,2,2,2,3,0,0,0],
-  [0,0,3,2,2,3,3,3,2,2,3,0,0,0],
-  [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
-  [0,0,0,3,3,2,2,2,3,3,0,0,0,0],
-  [0,0,3,2,0,3,3,3,0,2,3,0,0,0],
-  [0,0,3,2,0,0,0,0,0,2,3,0,0,0],
-  [0,0,0,1,3,2,2,2,3,1,0,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-// ADULT — mature creature with a wide body and expressive face
-const SPRITE_ADULT_NEUTRAL: SpriteMatrix = [
-  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
+// ─── DOG — broad head with floppy ears and a square snout ─────────────────────
+const SPRITE_DOG_NEUTRAL: SpriteMatrix = [
+  [0,0,1,1,0,0,0,0,0,0,1,1,0,0],
+  [0,1,2,2,1,0,0,0,0,1,2,2,1,0],
+  [0,1,2,2,1,1,1,1,1,1,2,2,1,0],
+  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
   [0,0,1,2,2,2,2,2,2,2,2,1,0,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-  [1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-  [1,2,2,1,1,1,2,1,1,1,2,2,2,1],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,0,1,1,1,0,0,1,1,1,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-const SPRITE_ADULT_HAPPY: SpriteMatrix = [
-  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
+  [0,0,1,2,1,2,2,2,2,1,2,1,0,0],
   [0,0,1,2,2,2,2,2,2,2,2,1,0,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [1,2,2,2,1,1,2,1,1,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,1,2,2,2,2,2,1,2,2,2,1],
-  [1,2,2,2,1,1,1,1,1,2,2,2,2,1],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,0,1,1,1,0,0,1,1,1,0,0,0],
+  [0,0,1,2,2,2,1,1,2,2,2,1,0,0],
+  [0,0,1,2,2,1,1,1,1,2,2,1,0,0],
+  [0,0,1,2,2,2,1,1,2,2,2,1,0,0],
+  [0,0,0,1,2,2,2,2,2,2,1,0,0,0],
+  [0,0,0,0,1,1,2,2,1,1,0,0,0,0],
+  [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
-// SAD: clear inverted-U frown + dark-green tear (index 7)
-const SPRITE_ADULT_SAD: SpriteMatrix = [
-  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
+const SPRITE_DOG_HAPPY: SpriteMatrix = [
+  [0,0,1,1,0,0,0,0,0,0,1,1,0,0],
+  [0,1,2,2,1,0,0,0,0,1,2,2,1,0],
+  [0,1,2,2,1,1,1,1,1,1,2,2,1,0],
+  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
   [0,0,1,2,2,2,2,2,2,2,2,1,0,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,2,1,2,2,2,1,2,2,2,2,1], // frown corners up
-  [1,2,2,2,2,1,1,1,2,2,2,2,2,1], // frown base down
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,7,1,2,3,2,2,2,2,3,2,1,0,0], // dark-green tear
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,0,1,1,1,0,0,1,1,1,0,0,0],
+  [0,0,1,2,1,1,2,2,1,1,2,1,0,0],
+  [0,0,1,2,2,2,2,2,2,2,2,1,0,0],
+  [0,0,1,2,2,2,1,1,2,2,2,1,0,0],
+  [0,0,1,2,1,1,1,1,1,1,2,1,0,0],
+  [0,0,1,2,2,1,3,3,1,2,2,1,0,0],
+  [0,0,0,1,2,2,3,3,2,2,1,0,0,0],
+  [0,0,0,0,1,1,2,2,1,1,0,0,0,0],
+  [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
-const SPRITE_ADULT_SICK: SpriteMatrix = [
-  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
-  [0,0,1,2,2,2,2,2,2,2,2,1,5,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,5],
+const SPRITE_DOG_SAD: SpriteMatrix = [
+  [0,0,1,1,0,0,0,0,0,0,1,1,0,0],
+  [0,1,2,2,1,0,0,0,0,1,2,2,1,0],
+  [0,1,2,2,1,1,1,1,1,1,2,2,1,0],
   [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [1,2,2,2,1,2,2,2,1,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,5,1,1,1,1,5,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,0,1,1,1,0,0,1,1,1,0,0,0],
+  [0,0,1,2,2,2,2,2,2,2,2,1,0,0],
+  [0,0,1,2,1,2,2,2,2,1,2,1,0,0],
+  [0,0,1,2,2,2,2,2,2,2,2,1,0,0],
+  [0,0,1,2,2,1,1,1,1,2,2,1,0,0],
+  [0,0,1,2,2,1,1,1,1,2,2,1,0,0],
+  [0,0,1,2,2,2,1,1,2,2,2,1,0,0],
+  [0,0,7,1,2,2,2,2,2,2,1,0,0,0],
+  [0,0,0,0,1,1,2,2,1,1,0,0,0,0],
+  [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
   [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
 ];
 
-const SPRITE_ADULT_SLEEPING: SpriteMatrix = [
-  [0,0,0,1,1,1,1,1,1,1,1,0,0,0],
-  [0,0,1,2,2,2,2,2,2,2,2,1,1,0],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,1],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [1,2,2,2,3,3,2,3,3,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,2,2,3,3,3,2,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [1,2,2,2,2,2,2,2,2,2,2,2,2,1],
-  [0,1,2,2,2,2,2,2,2,2,2,2,1,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,1,2,3,2,2,2,2,3,2,1,0,0],
-  [0,0,0,1,1,1,0,0,1,1,1,0,0,0],
-  [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-];
-
-// DEAD — ghost with X eyes floating upward
+// ─── DEAD — ghost with X eyes (shared across types) ──────────────────────────
 const SPRITE_DEAD: SpriteMatrix = [
   [0,0,0,0,3,3,3,3,3,0,0,0,0,0],
   [0,0,0,3,2,2,2,2,2,3,0,0,0,0],
@@ -431,77 +219,34 @@ const SPRITE_DEAD: SpriteMatrix = [
 
 // ─── Sprite Lookup ──────────────────────────────────────────────────────────
 
-function getSprite(stage: LifeStage, mood: Mood): SpriteMatrix {
+const SPRITES: Record<PetType, Record<'happy' | 'neutral' | 'sad', SpriteMatrix>> = {
+  plant: { happy: SPRITE_PLANT_HAPPY, neutral: SPRITE_PLANT_NEUTRAL, sad: SPRITE_PLANT_SAD },
+  cat:   { happy: SPRITE_CAT_HAPPY,   neutral: SPRITE_CAT_NEUTRAL,   sad: SPRITE_CAT_SAD },
+  dog:   { happy: SPRITE_DOG_HAPPY,   neutral: SPRITE_DOG_NEUTRAL,   sad: SPRITE_DOG_SAD },
+};
+
+function getSprite(petType: PetType, mood: Mood): SpriteMatrix {
   if (mood === 'dead') return SPRITE_DEAD;
-  if (stage === 'egg')  return SPRITE_EGG;
-
-  const table: Record<LifeStage, Record<Mood | 'default', SpriteMatrix>> = {
-    egg: {
-      happy:    SPRITE_EGG,
-      neutral:  SPRITE_EGG,
-      sad:      SPRITE_EGG,
-      sick:     SPRITE_EGG,
-      sleeping: SPRITE_EGG,
-      dead:     SPRITE_DEAD,
-      default:  SPRITE_EGG,
-    },
-    baby: {
-      happy:    SPRITE_BABY_HAPPY,
-      neutral:  SPRITE_BABY_NEUTRAL,
-      sad:      SPRITE_BABY_SAD,
-      sick:     SPRITE_BABY_SICK,
-      sleeping: SPRITE_BABY_SLEEPING,
-      dead:     SPRITE_DEAD,
-      default:  SPRITE_BABY_NEUTRAL,
-    },
-    child: {
-      happy:    SPRITE_CHILD_HAPPY,
-      neutral:  SPRITE_CHILD_NEUTRAL,
-      sad:      SPRITE_CHILD_SAD,
-      sick:     SPRITE_CHILD_SICK,
-      sleeping: SPRITE_CHILD_SLEEPING,
-      dead:     SPRITE_DEAD,
-      default:  SPRITE_CHILD_NEUTRAL,
-    },
-    teen: {
-      happy:    SPRITE_TEEN_HAPPY,
-      neutral:  SPRITE_TEEN_NEUTRAL,
-      sad:      SPRITE_TEEN_SAD,
-      sick:     SPRITE_TEEN_SICK,
-      sleeping: SPRITE_TEEN_SLEEPING,
-      dead:     SPRITE_DEAD,
-      default:  SPRITE_TEEN_NEUTRAL,
-    },
-    adult: {
-      happy:    SPRITE_ADULT_HAPPY,
-      neutral:  SPRITE_ADULT_NEUTRAL,
-      sad:      SPRITE_ADULT_SAD,
-      sick:     SPRITE_ADULT_SICK,
-      sleeping: SPRITE_ADULT_SLEEPING,
-      dead:     SPRITE_DEAD,
-      default:  SPRITE_ADULT_NEUTRAL,
-    },
-  };
-
-  const stageMap = table[stage];
-  return stageMap[mood] ?? stageMap['default'];
+  const byMood = SPRITES[petType];
+  if (mood === 'happy') return byMood.happy;
+  if (mood === 'sad') return byMood.sad;
+  return byMood.neutral;
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
 interface PetSpriteProps {
-  stage: LifeStage;
-  mood:  Mood;
+  petType: PetType;
+  mood: Mood;
+  cellSize?: number; // pt per pixel cell; defaults to the theme CELL_SIZE
 }
 
-export function PetSprite({ stage, mood }: PetSpriteProps): React.ReactElement {
-  const sprite      = getSprite(stage, mood);
+export function PetSprite({ petType, mood, cellSize = CELL_SIZE }: PetSpriteProps): React.ReactElement {
+  const sprite = getSprite(petType, mood);
   const [translateY] = useState(() => new Animated.Value(0));
-  const animRef     = useRef<Animated.CompositeAnimation | null>(null);
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  const isDead     = mood === 'dead';
-  const isSleeping = mood === 'sleeping';
-  const isEgg      = stage === 'egg';
+  const isDead = mood === 'dead';
 
   useEffect(() => {
     let reducedMotion = false;
@@ -516,54 +261,24 @@ export function PetSprite({ stage, mood }: PetSpriteProps): React.ReactElement {
           return;
         }
 
-        if (isSleeping) {
-          // Sleeping: slow gentle sway so it reads as resting, not suspended
-          animRef.current = Animated.loop(
-            Animated.sequence([
-              Animated.timing(translateY, {
-                toValue:         -2,
-                duration:        1200,
-                useNativeDriver: true,
-              }),
-              Animated.timing(translateY, {
-                toValue:         0,
-                duration:        1200,
-                useNativeDriver: true,
-              }),
-            ]),
-          );
-        } else {
-          // Alive: regular bob
-          animRef.current = Animated.loop(
-            Animated.sequence([
-              Animated.timing(translateY, {
-                toValue:         isEgg ? -3 : -4,
-                duration:        600,
-                useNativeDriver: true,
-              }),
-              Animated.timing(translateY, {
-                toValue:         0,
-                duration:        600,
-                useNativeDriver: true,
-              }),
-            ]),
-          );
-        }
+        animRef.current = Animated.loop(
+          Animated.sequence([
+            Animated.timing(translateY, { toValue: -4, duration: 600, useNativeDriver: true }),
+            Animated.timing(translateY, { toValue: 0, duration: 600, useNativeDriver: true }),
+          ]),
+        );
         animRef.current.start();
       });
 
     return () => {
       animRef.current?.stop();
     };
-  }, [isDead, isSleeping, isEgg, translateY]);
+  }, [isDead, translateY]);
 
-  // Egg has no mood variants — hard-code accessibility label per spec #12
   const accessLabel =
-    stage === 'egg'
-      ? 'egg, hatching'
-      : mood === 'dead'
+    mood === 'dead'
       ? 'Pet sprite: ghost'
-      : `Pet sprite: ${mood} ${stage}`;
+      : `Pet sprite: ${mood} ${petType}`;
 
   return (
     <Animated.View
@@ -579,7 +294,7 @@ export function PetSprite({ stage, mood }: PetSpriteProps): React.ReactElement {
               <View
                 key={colIdx}
                 style={[
-                  styles.cell,
+                  { width: cellSize, height: cellSize },
                   { backgroundColor: color === 'transparent' ? LCD_BG : color },
                 ]}
               />
@@ -593,13 +308,9 @@ export function PetSprite({ stage, mood }: PetSpriteProps): React.ReactElement {
 
 const styles = StyleSheet.create({
   container: {
-    alignSelf: 'center',  // center the sprite block in its parent
+    alignSelf: 'center',
   },
   row: {
     flexDirection: 'row',
-  },
-  cell: {
-    width:  CELL_SIZE,
-    height: CELL_SIZE,
   },
 });

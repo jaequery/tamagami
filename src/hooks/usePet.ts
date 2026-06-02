@@ -1,33 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
-  clean,
   createInitialPet,
   feed,
   getMood,
-  heal,
   play,
   rename as engineRename,
-  restart as engineRestart,
   simulate,
-  toggleSleep,
+  water,
 } from '../game/engine';
 import { initNotifications, rescheduleCareNotifications } from '../game/notifications';
-import { loadPet, savePet } from '../game/storage';
-import { syncWidget } from '../game/widget';
-import type { PetActions, PetState, UsePet } from '../game/types';
+import { clearPet, loadPet, savePet } from '../game/storage';
+import { clearWidget, syncWidget } from '../game/widget';
+import * as Notifications from 'expo-notifications';
+import type { PetActions, PetState, PetType, UsePet } from '../game/types';
 
 const TICK_INTERVAL_MS = 1000;
 const PERSIST_INTERVAL_MS = 10_000;
 
 export function usePet(): UsePet {
-  const [pet, setPet] = useState<PetState>(() => createInitialPet('Pixel', Date.now()));
+  // null until the user picks a type (or after reset).
+  const [pet, setPet] = useState<PetState | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Refs for mutable state that callbacks close over. applyState() and the
-  // bootstrap effect keep petRef in sync synchronously; this effect is the
-  // backstop for any other setPet path.
-  const petRef = useRef<PetState>(pet);
+  // bootstrap effect keep petRef in sync synchronously.
+  const petRef = useRef<PetState | null>(pet);
   useEffect(() => {
     petRef.current = pet;
   }, [pet]);
@@ -65,9 +63,15 @@ export function usePet(): UsePet {
       const loaded = await loadPet();
       if (cancelled) return;
 
-      const base = loaded ?? createInitialPet('Pixel', Date.now());
-      const simulated = simulate(base, Date.now());
+      // No saved pet (new user or post-reset) → show the selection screen.
+      if (loaded === null) {
+        setPet(null);
+        petRef.current = null;
+        setLoading(false);
+        return;
+      }
 
+      const simulated = simulate(loaded, Date.now());
       setPet(simulated);
       petRef.current = simulated;
       setLoading(false);
@@ -81,16 +85,14 @@ export function usePet(): UsePet {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Tick interval (1s) — only runs while app is foregrounded ─────────────
-  // Fix #10: interval is created/cleared in step with AppState so it does not
-  // fire while backgrounded (the AppState catch-up already handles that time).
+  // ── Tick interval (1s) — only runs while a live pet is foregrounded ───────
   const tickIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startTick = useCallback(() => {
     if (tickIntervalRef.current !== null) return; // already running
     tickIntervalRef.current = setInterval(() => {
       const current = petRef.current;
-      if (current.isDead) return;
+      if (current === null || current.isDead) return;
       const next = simulate(current, Date.now());
       applyState(next);
     }, TICK_INTERVAL_MS);
@@ -103,90 +105,85 @@ export function usePet(): UsePet {
     }
   }, []);
 
+  // Depend on the presence of a pet, not its identity — `pet` gets a new object
+  // every tick, and depending on it directly would tear down + rebuild the
+  // interval every second.
+  const hasPet = pet !== null;
   useEffect(() => {
-    if (loading) return;
-
-    // Start immediately when loading finishes (app is foregrounded at this point)
+    if (loading || !hasPet) return;
     startTick();
     return stopTick;
-  }, [loading, startTick, stopTick]);
+  }, [loading, hasPet, startTick, stopTick]);
 
   // ── AppState: catch-up on foreground, persist on background ──────────────
   useEffect(() => {
     if (loading) return;
 
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active') {
-        // Fix #8: skip simulate/persist I/O if the pet is already dead
-        const current = petRef.current;
-        if (current.isDead) return;
+      const current = petRef.current;
+      if (current === null) return; // nothing to simulate on the selection screen
 
+      if (nextAppState === 'active') {
+        if (current.isDead) return;
         const next = simulate(current, Date.now());
         applyState(next);
-
-        // Fix #10: restart the tick interval when returning to foreground
         startTick();
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
-        // Fix #10: pause the interval while backgrounded — no need to fire every second
         stopTick();
-        void persist(petRef.current, true);
+        void persist(current, true);
       }
     });
 
     return () => subscription.remove();
   }, [loading, applyState, persist, startTick, stopTick]);
 
-  // ── Individual action callbacks ───────────────────────────────────────────
+  // ── Action callbacks ──────────────────────────────────────────────────────
   const actionFeed = useCallback(() => {
-    const next = feed(petRef.current, Date.now());
-    applyState(next, true);
+    if (petRef.current === null) return;
+    applyState(feed(petRef.current, Date.now()), true);
   }, [applyState]);
 
   const actionPlay = useCallback(() => {
-    const next = play(petRef.current, Date.now());
-    applyState(next, true);
+    if (petRef.current === null) return;
+    applyState(play(petRef.current, Date.now()), true);
   }, [applyState]);
 
-  const actionToggleSleep = useCallback(() => {
-    const next = toggleSleep(petRef.current, Date.now());
-    applyState(next, true);
+  const actionWater = useCallback(() => {
+    if (petRef.current === null) return;
+    applyState(water(petRef.current, Date.now()), true);
   }, [applyState]);
 
-  const actionClean = useCallback(() => {
-    const next = clean(petRef.current, Date.now());
-    applyState(next, true);
+  const actionSelectType = useCallback((petType: PetType, name?: string) => {
+    applyState(createInitialPet(name ?? 'Pixel', petType, Date.now()), true);
   }, [applyState]);
 
-  const actionHeal = useCallback(() => {
-    const next = heal(petRef.current, Date.now());
-    applyState(next, true);
-  }, [applyState]);
-
-  const actionRestart = useCallback((name?: string) => {
-    const next = engineRestart(petRef.current, Date.now(), name);
-    applyState(next, true);
-  }, [applyState]);
+  const actionReset = useCallback(() => {
+    stopTick();
+    setPet(null);
+    petRef.current = null;
+    void clearPet();
+    void Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
+    clearWidget();
+  }, [stopTick]);
 
   const actionRename = useCallback((name: string) => {
-    const next = engineRename(petRef.current, name);
-    applyState(next, true);
+    if (petRef.current === null) return;
+    applyState(engineRename(petRef.current, name), true);
   }, [applyState]);
 
-  // Fix #7: stable actions object — identity only changes when a callback dep changes
   const actions: PetActions = useMemo(() => ({
     feed: actionFeed,
     play: actionPlay,
-    toggleSleep: actionToggleSleep,
-    clean: actionClean,
-    heal: actionHeal,
-    restart: actionRestart,
+    water: actionWater,
+    selectType: actionSelectType,
+    reset: actionReset,
     rename: actionRename,
-  }), [actionFeed, actionPlay, actionToggleSleep, actionClean, actionHeal, actionRestart, actionRename]);
+  }), [actionFeed, actionPlay, actionWater, actionSelectType, actionReset, actionRename]);
 
   return {
     pet,
     actions,
     loading,
-    mood: getMood(pet),
+    mood: pet ? getMood(pet) : 'neutral',
   };
 }

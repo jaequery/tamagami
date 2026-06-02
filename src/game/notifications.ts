@@ -68,8 +68,6 @@ export async function rescheduleCareNotifications(state: PetState): Promise<void
       .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier));
     await Promise.all(cancelPromises);
 
-    if (state.isSleeping) return;
-
     const projections = nextStageAt(state);
     const now = Date.now();
 

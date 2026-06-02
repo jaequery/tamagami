@@ -1,9 +1,9 @@
-# 🥚 Tamagami
+# 🐾 Tamagami
 
-A retro pixel-art virtual-pet iPhone app — feed it, play with it, clean up after
-it, and keep it alive. Built with Expo (React Native + TypeScript). The pet's
-needs decay in **real time, even while the app is closed**, and local
-notifications nudge you when it needs care.
+A retro pixel-art virtual-pet iPhone app — pick a pet, care for it, and keep it
+alive. Built with Expo (React Native + TypeScript). The pet's needs decay in
+**real time, even while the app is closed**, and local notifications nudge you
+when it needs care.
 
 Aesthetic: classic Game Boy / Tamagotchi LCD — Game Boy-green screen, hard pixel
 edges, the `Press Start 2P` bitmap font, segmented stat bars, and pet sprites
@@ -11,15 +11,17 @@ drawn cell-by-cell as real pixel art.
 
 ## Features
 
-- **5 needs that decay over time:** hunger, happiness, energy, hygiene, health.
-- **Care actions:** `FEED`, `PLAY`, `SLEEP`/`WAKE`, `CLEAN`, `HEAL` — each with
-  haptic feedback.
+- **Pick your pet:** choose a **plant**, **cat**, or **dog** up front — each with
+  its own sprite and care loop. Your choice is saved; returning users skip
+  straight to their pet.
+- **Care scaled to the pet:**
+  - 🌱 **Plant** — the easy one. A single `WATER` stat to top up. That's it.
+  - 🐱 **Cat** / 🐶 **Dog** — `FEED` and `PLAY` to keep hunger, happiness, and
+    health up.
 - **Real-time offline simulation:** close the app for an hour and the pet ages an
   hour (capped at 7 days). Catch-up runs on every foreground.
-- **Life stages:** egg → baby → child → teen → adult, each with its own sprite,
-  plus distinct happy / sad / sick / sleeping / dead expressions.
-- **Consequences:** neglect → poop piles up → sickness → death (with a cause).
-  A death screen lets you hatch a fresh pet.
+- **Consequences:** let the needs bottom out and the pet dies (with a cause —
+  thirst, starvation, or neglect). A death screen lets you start over.
 - **Local notifications:** schedules reminders for when a stat will cross its
   "needs care" threshold. Works fully even if you deny the permission.
 - **Local-only persistence:** state lives on-device in AsyncStorage. No account,
@@ -69,7 +71,7 @@ into the Xcode project on every prebuild); the App Group is
 ```bash
 npm run typecheck   # tsc --noEmit (strict)
 npm run lint        # eslint (eslint-config-expo)
-npm test            # jest — 58 engine unit tests
+npm test            # jest — 40 engine unit tests
 ```
 
 All three pass, and `npx expo export -p ios` bundles cleanly.
@@ -79,33 +81,38 @@ All three pass, and `npx expo export -p ios` bundles cleanly.
 ```
 src/
   game/
-    types.ts          # PetState / PetStats / hook contract types
-    constants.ts      # ★ all gameplay tunables (decay rates, thresholds, stage ages)
-    engine.ts         # pure simulation: simulate() + action reducers (no RN imports)
+    types.ts          # PetType / PetState / PetStats / hook contract types
+    profiles.ts       # ★ per-type care model: stat bars + action buttons + copy
+    constants.ts      # ★ all gameplay tunables (decay rates, thresholds)
+    engine.ts         # pure simulation: type-aware simulate() + action reducers (no RN imports)
     storage.ts        # versioned AsyncStorage load/save with strict validation
     notifications.ts  # expo-notifications wrapper (permission + projected reminders)
-    engine.test.ts    # 58 unit tests
+    engine.test.ts    # 40 unit tests
   hooks/
     usePet.ts         # loads state, foreground tick, AppState catch-up, persistence
   components/
     PixelText.tsx     # Press Start 2P text wrapper
     StatBar.tsx       # segmented pixel progress bar (warning + critical states)
     PixelButton.tsx   # chunky pixel action button + haptics
-    PetSprite.tsx     # the pet, drawn as a grid of <View> cells per stage + mood
+    PetSprite.tsx     # the pet, drawn as a grid of <View> cells per petType + mood
     DeviceFrame.tsx   # the handheld LCD device shell
   screens/
-    HomeScreen.tsx    # the single game screen + death/restart overlay
+    PetSelectionScreen.tsx # first-run picker: plant / cat / dog
+    HomeScreen.tsx         # the game screen + death/restart overlay (profile-driven)
   theme.ts            # the entire pixel palette + spacing scale (single source of color)
-App.tsx               # font load → HomeScreen
+App.tsx               # font load → selection ↔ home routing
 ```
 
 ## Tuning the game
 
-The whole gameplay cadence lives in **`src/game/constants.ts`** — decay rates,
-sickness/death thresholds, poop interval, life-stage durations, the offline
-catch-up cap, and notification thresholds are all named constants with comments.
-The simulation in `engine.ts` is pure and fully unit-tested, so you can adjust a
-constant and re-run `npm test` to see the effect immediately.
+Two files drive the design:
 
-By default the egg hatches in ~45s (for instant gratification) and the full
-needs cycle plays out over a few hours per stat.
+- **`src/game/profiles.ts`** decides *what each pet type cares about* — which stat
+  bars it shows and which action buttons it offers. Add a stat or a type here and
+  both the home screen and the widget follow.
+- **`src/game/constants.ts`** holds the cadence — decay rates, health thresholds,
+  the offline catch-up cap, and notification thresholds, all named with comments.
+
+The simulation in `engine.ts` is pure and fully unit-tested, so you can adjust a
+constant and re-run `npm test` to see the effect immediately. The Swift widget
+(`targets/widget/`) mirrors both files — keep the two in sync.

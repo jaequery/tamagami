@@ -20,7 +20,7 @@ struct SmallWidgetView: View {
     private var state: PetState { entry.state }
     private var mood:  Mood     { entry.mood }
 
-    /// The two most urgent stats to show in limited space.
+    /// The most urgent stats to show in limited space.
     private var urgentStats: [(label: String, value: Double)] {
         twoWorstStats(in: state)
     }
@@ -47,22 +47,22 @@ struct SmallWidgetView: View {
     private var aliveSmallView: some View {
         VStack(spacing: 2) {
             // Pet sprite — centered
-            PixelSprite(stage: state.stage, mood: mood, cellSize: 3)
+            PixelSprite(petType: state.petType, mood: mood, cellSize: 3)
                 .frame(maxWidth: .infinity, alignment: .center)
 
-            // Name + stage
+            // Name + type
             Text(state.name)
                 .font(.system(size: 8, weight: .bold, design: .monospaced))
                 .foregroundColor(LCD_GREEN_COLOR)
                 .lineLimit(1)
-            Text("\(stageLabel(state.stage)) · \(ageLabel(state.ageSeconds))")
+            Text("\(state.petType.title) · \(ageLabel(state.ageSeconds))")
                 .font(.system(size: 6, weight: .regular, design: .monospaced))
                 .foregroundColor(LCD_MID_COLOR)
                 .lineLimit(1)
 
             Spacer(minLength: 2)
 
-            // Two worst stats
+            // Most urgent stats
             VStack(spacing: 2) {
                 ForEach(Array(urgentStats.enumerated()), id: \.offset) { _, stat in
                     CompactStatBar(label: stat.label, value: stat.value, segments: 5, labelWidth: 32)
@@ -76,7 +76,7 @@ struct SmallWidgetView: View {
 
     private var deadSmallView: some View {
         VStack(spacing: 3) {
-            PixelSprite(stage: state.stage, mood: .dead, cellSize: 3)
+            PixelSprite(petType: state.petType, mood: .dead, cellSize: 3)
                 .frame(maxWidth: .infinity, alignment: .center)
             Text("R.I.P.")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -122,19 +122,19 @@ struct MediumWidgetView: View {
             // Left: sprite
             VStack {
                 Spacer(minLength: 0)
-                PixelSprite(stage: state.stage, mood: mood, cellSize: 3)
+                PixelSprite(petType: state.petType, mood: mood, cellSize: 3)
                 Spacer(minLength: 0)
             }
             .frame(width: 50)
             .padding(.leading, 6)
 
-            // Right: name + stats
+            // Right: name + per-type stats
             VStack(alignment: .leading, spacing: 3) {
                 Text(state.name)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(LCD_GREEN_COLOR)
                     .lineLimit(1)
-                Text("\(stageLabel(state.stage))  \(ageLabel(state.ageSeconds))")
+                Text("\(state.petType.title)  \(ageLabel(state.ageSeconds))")
                     .font(.system(size: 7, weight: .regular, design: .monospaced))
                     .foregroundColor(LCD_MID_COLOR)
                     .lineLimit(1)
@@ -143,11 +143,9 @@ struct MediumWidgetView: View {
                     .background(LCD_MID_COLOR)
                     .padding(.vertical, 1)
 
-                CompactStatBar(label: "HUNGER",  value: state.stats.hunger,    segments: 6, labelWidth: 38)
-                CompactStatBar(label: "HAPPY",   value: state.stats.happiness, segments: 6, labelWidth: 38)
-                CompactStatBar(label: "ENERGY",  value: state.stats.energy,    segments: 6, labelWidth: 38)
-                CompactStatBar(label: "HYGIENE", value: state.stats.hygiene,   segments: 6, labelWidth: 38)
-                CompactStatBar(label: "HEALTH",  value: state.stats.health,    segments: 6, labelWidth: 38)
+                ForEach(Array(statBars(for: state).enumerated()), id: \.offset) { _, stat in
+                    CompactStatBar(label: stat.label, value: stat.value, segments: 6, labelWidth: 38)
+                }
             }
             .padding(.vertical, 8)
             .padding(.trailing, 6)
@@ -156,7 +154,7 @@ struct MediumWidgetView: View {
 
     private var deadMediumView: some View {
         HStack(spacing: 12) {
-            PixelSprite(stage: state.stage, mood: .dead, cellSize: 3)
+            PixelSprite(petType: state.petType, mood: .dead, cellSize: 3)
                 .frame(width: 50)
                 .padding(.leading, 6)
 
@@ -192,8 +190,8 @@ struct AccessoryCircularView: View {
             Gauge(value: lowestVal / 100.0) {
                 EmptyView()
             } currentValueLabel: {
-                // Tiny sprite or initial letter in the center
-                MonochromeSprite(stage: state.stage, mood: entry.mood, cellSize: 2)
+                // Tiny sprite in the center
+                MonochromeSprite(petType: state.petType, mood: entry.mood, cellSize: 2)
                     .scaledToFit()
             }
             .gaugeStyle(.accessoryCircular)
@@ -211,13 +209,13 @@ struct AccessoryRectangularView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            // Line 1: name · stage
-            Text("\(state.name) · \(stageLabel(state.stage))")
+            // Line 1: name · type
+            Text("\(state.name) · \(state.petType.title)")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .lineLimit(1)
                 .widgetAccentable()
 
-            // Lines 2-3: two worst stats as "LABEL: value%"
+            // Following lines: most urgent stats as "LABEL: value%"
             ForEach(Array(worst.enumerated()), id: \.offset) { _, stat in
                 HStack(spacing: 4) {
                     Text(stat.label + ":")
@@ -238,19 +236,17 @@ struct AccessoryInlineView: View {
 
     private var state: PetState { entry.state }
 
-    // Short single-line: stage-emoji + name + mood word
-    private var stageGlyph: String {
-        switch state.stage {
-        case .egg:   return "🥚"
-        case .baby:  return "🐣"
-        case .child: return "🐥"
-        case .teen:  return "🐤"
-        case .adult: return "🐔"
+    // Short single-line: type-emoji + name + mood word
+    private var typeGlyph: String {
+        switch state.petType {
+        case .plant: return "🌱"
+        case .cat:   return "🐱"
+        case .dog:   return "🐶"
         }
     }
 
     var body: some View {
-        Text("\(stageGlyph) \(state.name): \(moodWord(entry.mood, state: state))")
+        Text("\(typeGlyph) \(state.name): \(moodWord(entry.mood, state: state))")
             .font(.system(size: 10, design: .monospaced))
             .lineLimit(1)
             .widgetAccentable()

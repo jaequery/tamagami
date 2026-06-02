@@ -31,3 +31,17 @@ export function syncWidget(state: PetState, reload = false): void {
     // Widget mirroring is best-effort — never let it break the app.
   }
 }
+
+/**
+ * Clear the mirrored pet from the App Group (used on reset → selection) so the
+ * widget falls back to its placeholder instead of showing a stale pet.
+ */
+export function clearWidget(): void {
+  if (Platform.OS !== 'ios') return;
+  try {
+    storage.remove(WIDGET_PET_KEY);
+    ExtensionStorage.reloadWidget();
+  } catch {
+    // Best-effort — never let it break the app.
+  }
+}

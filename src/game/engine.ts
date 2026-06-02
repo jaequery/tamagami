@@ -1,38 +1,23 @@
-import type { LifeStage, Mood, PetState } from './types';
+import type { CauseOfDeath, Mood, PetState, PetType } from './types';
+import { isAnimal } from './profiles';
 import {
-  CLEAN_HYGIENE_RESTORE,
   CURRENT_VERSION,
-  ENERGY_DECAY_PER_SECOND,
-  ENERGY_RECOVER_PER_SECOND,
   FEED_HAPPINESS_DELTA,
   FEED_HUNGER_BOOST,
+  HAPPINESS_CRITICAL_THRESHOLD,
   HAPPINESS_DECAY_PER_SECOND,
-  HEAL_HEALTH_BOOST,
-  HEALTH_DECAY_CRITICAL_HUNGER_PER_SECOND,
-  HEALTH_DECAY_SICK_PER_SECOND,
+  HEALTH_DECAY_CRITICAL_PER_SECOND,
   HEALTH_REGEN_PER_SECOND,
   HUNGER_CRITICAL_THRESHOLD,
   HUNGER_DECAY_PER_SECOND,
-  HYGIENE_DECAY_PER_SECOND,
-  HYGIENE_DRAIN_PER_POOP_PER_SECOND,
-  HYGIENE_OVERFLOW_DRAIN_PER_SECOND,
   MAX_CATCHUP_SECONDS,
-  NOTIFY_ENERGY_THRESHOLD,
   NOTIFY_HAPPINESS_THRESHOLD,
   NOTIFY_HUNGER_THRESHOLD,
-  NOTIFY_HYGIENE_THRESHOLD,
-  PLAY_ENERGY_COST,
+  NOTIFY_WATER_THRESHOLD,
   PLAY_HAPPINESS_BOOST,
   PLAY_HUNGER_COST,
-  POOP_INTERVAL_SECONDS,
-  POOP_OVERFLOW_THRESHOLD,
-  SLEEP_HAPPINESS_DECAY_MULTIPLIER,
-  SLEEP_HUNGER_DECAY_MULTIPLIER,
-  SLEEP_HYGIENE_DECAY_MULTIPLIER,
-  STAGE_BABY_TO_CHILD_SECONDS,
-  STAGE_CHILD_TO_TEEN_SECONDS,
-  STAGE_EGG_HATCH_SECONDS,
-  STAGE_TEEN_TO_ADULT_SECONDS,
+  WATER_BOOST,
+  WATER_DECAY_PER_SECOND,
 } from './constants';
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
@@ -51,55 +36,23 @@ function sanitizeName(raw: string): string {
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
-export function createInitialPet(name: string, now: number): PetState {
+export function createInitialPet(name: string, petType: PetType, now: number): PetState {
   return {
     version: CURRENT_VERSION,
+    petType,
     name: sanitizeName(name),
     bornAt: now,
     lastTick: now,
     stats: {
       hunger: 80,
       happiness: 80,
-      energy: 100,
-      hygiene: 100,
       health: 100,
+      water: 100,
     },
-    stage: 'egg',
-    isSleeping: false,
-    isSick: false,
-    poops: 0,
     isDead: false,
     causeOfDeath: null,
     ageSeconds: 0,
   };
-}
-
-// ─── Stage resolution ─────────────────────────────────────────────────────────
-
-function resolveStage(ageSeconds: number): LifeStage {
-  if (ageSeconds < STAGE_EGG_HATCH_SECONDS) return 'egg';
-  if (ageSeconds < STAGE_BABY_TO_CHILD_SECONDS) return 'baby';
-  if (ageSeconds < STAGE_CHILD_TO_TEEN_SECONDS) return 'child';
-  if (ageSeconds < STAGE_TEEN_TO_ADULT_SECONDS) return 'teen';
-  return 'adult';
-}
-
-// ─── Sickness cause check ─────────────────────────────────────────────────────
-
-/**
- * Returns true while at least one cause for sickness is still present.
- * Used by simulate() to both SET and CLEAR isSick based on current stat values.
- *
- * Gameplay rule (for UI agent alignment):
- *  - Sickness triggers on: hunger === 0 OR hygiene === 0 OR poops > POOP_OVERFLOW_THRESHOLD
- *  - Sickness CLEARS automatically on the next tick once ALL causes are resolved
- *    (hunger > 0, hygiene > 0, poops <= POOP_OVERFLOW_THRESHOLD).
- *  - heal() provides an INSTANT cure regardless of cause state, plus a health bump.
- *  - Net effect: clean() clears poop-driven sickness on the next tick; heal()
- *    clears it immediately and restores health.
- */
-function hasSicknessCause(hunger: number, hygiene: number, poops: number): boolean {
-  return hunger === 0 || hygiene === 0 || poops > POOP_OVERFLOW_THRESHOLD;
 }
 
 // ─── simulate ────────────────────────────────────────────────────────────────
@@ -117,104 +70,63 @@ export function simulate(state: PetState, now: number): PetState {
     return { ...state, lastTick: now };
   }
 
-  let { hunger, happiness, energy, hygiene, health } = state.stats;
-  let { poops, isSick, causeOfDeath, ageSeconds } = state;
-  let isDead: boolean = state.isDead;
-  const isSleeping = state.isSleeping;
+  const ageSeconds = state.ageSeconds + elapsed;
 
-  // ── Age ──────────────────────────────────────────────────────────────────
-  ageSeconds += elapsed;
+  return isAnimal(state.petType)
+    ? simulateAnimal(state, now, elapsed, ageSeconds)
+    : simulatePlant(state, now, elapsed, ageSeconds);
+}
 
-  // ── Stat decay ───────────────────────────────────────────────────────────
-  if (isSleeping) {
-    hunger -= HUNGER_DECAY_PER_SECOND * SLEEP_HUNGER_DECAY_MULTIPLIER * elapsed;
-    happiness -= HAPPINESS_DECAY_PER_SECOND * SLEEP_HAPPINESS_DECAY_MULTIPLIER * elapsed;
-    energy = Math.min(100, energy + ENERGY_RECOVER_PER_SECOND * elapsed);
-    hygiene -= HYGIENE_DECAY_PER_SECOND * SLEEP_HYGIENE_DECAY_MULTIPLIER * elapsed;
-  } else {
-    hunger -= HUNGER_DECAY_PER_SECOND * elapsed;
-    happiness -= HAPPINESS_DECAY_PER_SECOND * elapsed;
-    energy -= ENERGY_DECAY_PER_SECOND * elapsed;
-    hygiene -= HYGIENE_DECAY_PER_SECOND * elapsed;
-  }
+// ── Plant: a single water stat that drains slowly; empty → wilted (thirst) ────
+function simulatePlant(state: PetState, now: number, elapsed: number, ageSeconds: number): PetState {
+  const water = clamp(state.stats.water - WATER_DECAY_PER_SECOND * elapsed);
 
-  // ── Poop accumulation ────────────────────────────────────────────────────
-  // Poops don't accumulate while the egg hasn't hatched yet
-  if (state.stage !== 'egg') {
-    const newPoopCount = Math.floor(ageSeconds / POOP_INTERVAL_SECONDS);
-    const oldPoopCount = Math.floor(state.ageSeconds / POOP_INTERVAL_SECONDS);
-    poops += newPoopCount - oldPoopCount;
-  }
-
-  // ── Hygiene drag from poops ───────────────────────────────────────────────
-  if (poops > 0) {
-    hygiene -= HYGIENE_DRAIN_PER_POOP_PER_SECOND * poops * elapsed;
-  }
-  if (poops >= POOP_OVERFLOW_THRESHOLD) {
-    hygiene -= HYGIENE_OVERFLOW_DRAIN_PER_SECOND * elapsed;
-  }
-
-  // ── Clamp stats before sickness logic ────────────────────────────────────
-  hunger = clamp(hunger);
-  happiness = clamp(happiness);
-  energy = clamp(energy);
-  hygiene = clamp(hygiene);
-
-  // ── Sickness onset / recovery ─────────────────────────────────────────────
-  // isSick is SET when a cause appears AND CLEARED when all causes are resolved.
-  // heal() provides instant cure outside simulate(); this rule keeps the
-  // simulation coherent so clean() alone resolves poop-driven sickness.
-  if (hasSicknessCause(hunger, hygiene, poops)) {
-    isSick = true;
-  } else {
-    // All causes resolved — allow natural recovery (isSick → false).
-    // heal() can still be used for an instant cure + health bump.
-    isSick = false;
-  }
-
-  // ── Health changes ────────────────────────────────────────────────────────
-  if (isSick) {
-    health -= HEALTH_DECAY_SICK_PER_SECOND * elapsed;
-  } else if (hunger <= HUNGER_CRITICAL_THRESHOLD) {
-    health -= HEALTH_DECAY_CRITICAL_HUNGER_PER_SECOND * elapsed;
-  } else if (hunger > HUNGER_CRITICAL_THRESHOLD && hygiene > 0 && happiness > 0) {
-    // All needs reasonably satisfied — slow regen
-    health += HEALTH_REGEN_PER_SECOND * elapsed;
-  }
-  health = clamp(health);
-
-  // ── Death ─────────────────────────────────────────────────────────────────
-  if (health === 0 && !isDead) {
+  let isDead = false;
+  let causeOfDeath: CauseOfDeath = null;
+  if (water === 0) {
     isDead = true;
-    if (hunger <= HUNGER_CRITICAL_THRESHOLD) {
-      causeOfDeath = 'starvation';
-    } else if (isSick) {
-      causeOfDeath = 'sickness';
-    } else {
-      causeOfDeath = 'neglect';
-    }
+    causeOfDeath = 'thirst';
   }
-
-  // ── Life stage ────────────────────────────────────────────────────────────
-  const stage = resolveStage(ageSeconds);
 
   return {
     ...state,
     lastTick: now,
     ageSeconds,
-    stage,
-    isSleeping,
-    isSick,
-    poops,
     isDead,
     causeOfDeath,
-    stats: {
-      hunger: clamp(hunger),
-      happiness: clamp(happiness),
-      energy: clamp(energy),
-      hygiene: clamp(hygiene),
-      health: clamp(health),
-    },
+    stats: { ...state.stats, water },
+  };
+}
+
+// ── Cat / dog: hunger + happiness drain; health follows; empty health → death ─
+function simulateAnimal(state: PetState, now: number, elapsed: number, ageSeconds: number): PetState {
+  const hunger = clamp(state.stats.hunger - HUNGER_DECAY_PER_SECOND * elapsed);
+  const happiness = clamp(state.stats.happiness - HAPPINESS_DECAY_PER_SECOND * elapsed);
+
+  let health = state.stats.health;
+  const hungerCritical = hunger <= HUNGER_CRITICAL_THRESHOLD;
+  const happinessCritical = happiness <= HAPPINESS_CRITICAL_THRESHOLD;
+  if (hungerCritical || happinessCritical) {
+    health -= HEALTH_DECAY_CRITICAL_PER_SECOND * elapsed;
+  } else {
+    health += HEALTH_REGEN_PER_SECOND * elapsed;
+  }
+  health = clamp(health);
+
+  let isDead = false;
+  let causeOfDeath: CauseOfDeath = null;
+  if (health === 0) {
+    isDead = true;
+    causeOfDeath = hungerCritical ? 'starvation' : 'neglect';
+  }
+
+  return {
+    ...state,
+    lastTick: now,
+    ageSeconds,
+    isDead,
+    causeOfDeath,
+    stats: { ...state.stats, hunger, happiness, health },
   };
 }
 
@@ -222,7 +134,7 @@ export function simulate(state: PetState, now: number): PetState {
 
 export function feed(state: PetState, now: number): PetState {
   const simulated = simulate(state, now);
-  if (simulated.isDead || simulated.isSleeping) return simulated;
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
   return {
     ...simulated,
     stats: {
@@ -235,55 +147,31 @@ export function feed(state: PetState, now: number): PetState {
 
 export function play(state: PetState, now: number): PetState {
   const simulated = simulate(state, now);
-  if (simulated.isDead || simulated.isSleeping) return simulated;
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
   return {
     ...simulated,
     stats: {
       ...simulated.stats,
       happiness: clamp(simulated.stats.happiness + PLAY_HAPPINESS_BOOST),
-      energy: clamp(simulated.stats.energy - PLAY_ENERGY_COST),
       hunger: clamp(simulated.stats.hunger - PLAY_HUNGER_COST),
     },
   };
 }
 
-export function toggleSleep(state: PetState, now: number): PetState {
+export function water(state: PetState, now: number): PetState {
   const simulated = simulate(state, now);
-  if (simulated.isDead) return simulated;
+  if (simulated.isDead || simulated.petType !== 'plant') return simulated;
   return {
     ...simulated,
-    isSleeping: !simulated.isSleeping,
-  };
-}
-
-export function clean(state: PetState, now: number): PetState {
-  const simulated = simulate(state, now);
-  if (simulated.isDead) return simulated;
-  return {
-    ...simulated,
-    poops: 0,
     stats: {
       ...simulated.stats,
-      hygiene: CLEAN_HYGIENE_RESTORE,
+      water: clamp(simulated.stats.water + WATER_BOOST),
     },
   };
 }
 
-export function heal(state: PetState, now: number): PetState {
-  const simulated = simulate(state, now);
-  if (simulated.isDead || !simulated.isSick) return simulated;
-  return {
-    ...simulated,
-    isSick: false,
-    stats: {
-      ...simulated.stats,
-      health: clamp(simulated.stats.health + HEAL_HEALTH_BOOST),
-    },
-  };
-}
-
-export function restart(state: PetState, now: number, name?: string): PetState {
-  return createInitialPet(sanitizeName(name ?? state.name), now);
+export function restart(state: PetState, now: number, petType?: PetType, name?: string): PetState {
+  return createInitialPet(sanitizeName(name ?? state.name), petType ?? state.petType, now);
 }
 
 export function rename(state: PetState, name: string): PetState {
@@ -294,15 +182,13 @@ export function rename(state: PetState, name: string): PetState {
 
 export function getMood(state: PetState): Mood {
   if (state.isDead) return 'dead';
-  if (state.isSleeping) return 'sleeping';
-  if (state.isSick) return 'sick';
 
-  const { hunger, happiness, energy } = state.stats;
-  const avg = (hunger + happiness) / 2;
+  const level = state.petType === 'plant'
+    ? state.stats.water
+    : (state.stats.hunger + state.stats.happiness) / 2;
 
-  if (energy <= NOTIFY_ENERGY_THRESHOLD) return 'sad';
-  if (avg >= 60) return 'happy';
-  if (avg >= 30) return 'neutral';
+  if (level >= 60) return 'happy';
+  if (level >= 30) return 'neutral';
   return 'sad';
 }
 
@@ -331,40 +217,32 @@ export interface NotificationProjection {
 }
 
 /**
- * Projects when each stat will need attention based on current state.
+ * Projects when each *relevant* stat will need attention based on current state.
+ * Plant projects water; cat/dog project hunger + happiness.
  * Used by notifications.ts to schedule local push notifications.
  */
 export function nextStageAt(state: PetState): NotificationProjection[] {
-  if (state.isDead || state.isSleeping) return [];
+  if (state.isDead) return [];
 
-  const { hunger, happiness, energy, hygiene } = state.stats;
   const now = state.lastTick;
   const projections: NotificationProjection[] = [];
 
-  const hungerCross = projectCrossTime(hunger, NOTIFY_HUNGER_THRESHOLD, HUNGER_DECAY_PER_SECOND, now);
+  if (state.petType === 'plant') {
+    const waterCross = projectCrossTime(state.stats.water, NOTIFY_WATER_THRESHOLD, WATER_DECAY_PER_SECOND, now);
+    if (waterCross !== null) {
+      projections.push({ stat: 'water', label: `${state.name} is thirsty! 💧`, triggerAtMs: waterCross });
+    }
+    return projections;
+  }
+
+  const hungerCross = projectCrossTime(state.stats.hunger, NOTIFY_HUNGER_THRESHOLD, HUNGER_DECAY_PER_SECOND, now);
   if (hungerCross !== null) {
     projections.push({ stat: 'hunger', label: `${state.name} is hungry! 🍔`, triggerAtMs: hungerCross });
   }
 
-  const happinessCross = projectCrossTime(happiness, NOTIFY_HAPPINESS_THRESHOLD, HAPPINESS_DECAY_PER_SECOND, now);
+  const happinessCross = projectCrossTime(state.stats.happiness, NOTIFY_HAPPINESS_THRESHOLD, HAPPINESS_DECAY_PER_SECOND, now);
   if (happinessCross !== null) {
-    projections.push({ stat: 'happiness', label: `${state.name} is feeling lonely! 🎮`, triggerAtMs: happinessCross });
-  }
-
-  const energyCross = projectCrossTime(energy, NOTIFY_ENERGY_THRESHOLD, ENERGY_DECAY_PER_SECOND, now);
-  if (energyCross !== null) {
-    projections.push({ stat: 'energy', label: `${state.name} is exhausted! 💤`, triggerAtMs: energyCross });
-  }
-
-  // Fix #5: effective hygiene rate includes poop drain so notification fires before threshold.
-  const effectiveHygieneRate =
-    HYGIENE_DECAY_PER_SECOND +
-    HYGIENE_DRAIN_PER_POOP_PER_SECOND * state.poops +
-    (state.poops >= POOP_OVERFLOW_THRESHOLD ? HYGIENE_OVERFLOW_DRAIN_PER_SECOND : 0);
-
-  const hygieneCross = projectCrossTime(hygiene, NOTIFY_HYGIENE_THRESHOLD, effectiveHygieneRate, now);
-  if (hygieneCross !== null) {
-    projections.push({ stat: 'hygiene', label: `${state.name} needs a bath! 🛁`, triggerAtMs: hygieneCross });
+    projections.push({ stat: 'happiness', label: `${state.name} wants to play! 🎮`, triggerAtMs: happinessCross });
   }
 
   return projections;
