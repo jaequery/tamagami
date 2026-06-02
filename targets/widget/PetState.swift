@@ -1,6 +1,6 @@
 // PetState.swift
 // Model types + shared-data loader for the TamaWidget extension.
-// Reads from App Group "group.com.tamagotcha.app", key "petState".
+// Reads from App Group "group.com.tamagami.app", key "petState".
 
 import Foundation
 
@@ -66,7 +66,7 @@ extension PetState {
 // MARK: - Shared-container loader
 
 struct PetStateLoader {
-    static let suiteName = "group.com.tamagotcha.app"
+    static let suiteName = "group.com.tamagami.app"
     static let key       = "petState"
 
     /// Reads, decodes, and returns the current pet state.

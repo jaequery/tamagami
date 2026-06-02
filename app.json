@@ -7,10 +7,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.tamagotcha.app",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tamagami.app",
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.tamagotcha.app"]
+        "com.apple.security.application-groups": ["group.com.tamagami.app"]
       }
     },
     "android": {

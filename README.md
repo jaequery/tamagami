@@ -62,7 +62,7 @@ Apple Team ID to `app.json` under `expo.ios.appleTeamId`, then open
 `ios/tamagami.xcworkspace` in Xcode and run. The widget's Swift lives in
 `targets/widget/` (it is the source of truth — `@bacons/apple-targets` wires it
 into the Xcode project on every prebuild); the App Group is
-`group.com.tamagotcha.app`.
+`group.com.tamagami.app`.
 
 ## Quality checks
 

@@ -4,7 +4,7 @@ import type { PetState } from './types';
 
 /** App Group shared between the app and the iOS widget extension.
  *  Must match `ios.entitlements` in app.json and the widget's expo-target.config.js. */
-export const WIDGET_APP_GROUP = 'group.com.tamagotcha.app';
+export const WIDGET_APP_GROUP = 'group.com.tamagami.app';
 
 /** Key under which the full PetState (JSON string) is written for the widget to read. */
 export const WIDGET_PET_KEY = 'petState';
