@@ -9,6 +9,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tamagami.app",
+      "appleTeamId": "7BWUZV469T",
       "entitlements": {
         "com.apple.security.application-groups": ["group.com.tamagami.app"]
       }
