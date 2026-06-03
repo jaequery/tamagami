@@ -63,6 +63,12 @@
         },
         "projectId": "8032ef3b-0b02-4f4b-af3e-8200012ea133"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8032ef3b-0b02-4f4b-af3e-8200012ea133"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }
