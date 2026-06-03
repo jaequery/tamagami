@@ -7,4 +7,11 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*', 'node_modules/*', '.expo/*'],
   },
+  {
+    // Jest config/setup files run in the Node + Jest environment.
+    files: ['jest.setup.js', '*.config.js'],
+    languageOptions: {
+      globals: { jest: 'readonly', require: 'readonly', module: 'writable' },
+    },
+  },
 ]);

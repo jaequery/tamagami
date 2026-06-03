@@ -4,22 +4,27 @@ import {
   ScrollView,
   SafeAreaView,
   Animated,
+  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
 import type { CauseOfDeath, Mood, PetActions, PetState } from '../game/types';
 import { profileFor } from '../game/profiles';
 import type { ActionKey } from '../game/profiles';
+import { useNearby } from '../hooks/useNearby';
 import { DeviceFrame } from '../components/DeviceFrame';
 import { PetSprite } from '../components/PetSprite';
 import { StatBar } from '../components/StatBar';
 import { PixelButton } from '../components/PixelButton';
 import { PixelText } from '../components/PixelText';
+import { NearbyMeet } from '../components/NearbyMeet';
+import { FriendsModal } from '../components/FriendsModal';
 import {
   LCD_BG,
   LCD_DARK,
   LCD_SHADE2,
   COLOR_CRITICAL,
   COLOR_OVERLAY,
+  COLOR_WARNING,
   SHELL_DARK,
   SPACE_2,
   SPACE_4,
@@ -152,6 +157,45 @@ const deathStyles = StyleSheet.create({
   },
 });
 
+// ─── Social Bar ──────────────────────────────────────────────────────────────
+// Thin status line for the nearby feature: live peer presence on the left, a
+// tappable FRIENDS counter on the right.
+
+interface SocialBarProps {
+  nearbyName: string | null;
+  btProblem: boolean;
+  friendCount: number;
+  onOpenFriends: () => void;
+}
+
+function SocialBar({ nearbyName, btProblem, friendCount, onOpenFriends }: SocialBarProps): React.ReactElement {
+  return (
+    <View style={styles.socialBar}>
+      <View style={styles.socialLeft}>
+        {nearbyName !== null ? (
+          <>
+            <View style={styles.presenceDot} />
+            <PixelText variant="tiny" color={LCD_DARK} numberOfLines={1}>
+              NEAR: {nearbyName.toUpperCase()}
+            </PixelText>
+          </>
+        ) : btProblem ? (
+          <PixelText variant="tiny" color={COLOR_WARNING}>BLUETOOTH OFF</PixelText>
+        ) : null}
+      </View>
+
+      <TouchableOpacity
+        onPress={onOpenFriends}
+        hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Open friends list, ${friendCount} met`}
+      >
+        <PixelText variant="tiny" color={LCD_SHADE2}>FRIENDS {friendCount}</PixelText>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 // ─── HomeScreen ──────────────────────────────────────────────────────────────
 
 interface HomeScreenProps {
@@ -164,6 +208,21 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const profile = profileFor(pet.petType);
 
   const handleRestart = useCallback(() => actions.reset(), [actions]);
+
+  // ── Nearby (BLE) social loop ──
+  const { supported, bluetoothState, nearby, friends, meet, clearMeet } = useNearby(
+    pet,
+    actions.socialize,
+  );
+  // friendsOpenedAt doubles as the "open" flag and the reference time for the
+  // friends list's relative timestamps (captured in the event handler, so the
+  // render path stays pure).
+  const [friendsOpenedAt, setFriendsOpenedAt] = useState<number | null>(null);
+
+  const handleCloseFriends = useCallback(() => setFriendsOpenedAt(null), []);
+  const handleOpenFriends = useCallback(() => setFriendsOpenedAt(Date.now()), []);
+
+  const btProblem = bluetoothState === 'poweredOff' || bluetoothState === 'unauthorized';
 
   // Critical attention: any *relevant* stat at or below threshold
   const isCritical = profile.stats.some(
@@ -233,6 +292,26 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
               </View>
             </View>
 
+            {/* ── Social Bar (nearby pets) ── */}
+            {supported && !pet.isDead && (
+              <SocialBar
+                nearbyName={nearby?.friend.name ?? null}
+                btProblem={btProblem}
+                friendCount={friends.length}
+                onOpenFriends={handleOpenFriends}
+              />
+            )}
+
+            {/* ── Nearby Meet celebration ── */}
+            {meet !== null && (
+              <NearbyMeet
+                key={meet.nonce}
+                localType={pet.petType}
+                peer={meet.peer}
+                onDone={clearMeet}
+              />
+            )}
+
             {/* ── Death Overlay ── */}
             {pet.isDead && (
               <DeathOverlay
@@ -244,6 +323,13 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
           </View>
         </DeviceFrame>
       </ScrollView>
+
+      <FriendsModal
+        visible={friendsOpenedAt !== null}
+        now={friendsOpenedAt ?? 0}
+        friends={friends}
+        onClose={handleCloseFriends}
+      />
     </SafeAreaView>
   );
 }
@@ -302,5 +388,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexWrap:       'wrap',
     marginBottom:   SPACE_2,
+  },
+  socialBar: {
+    flexDirection:     'row',
+    justifyContent:    'space-between',
+    alignItems:        'center',
+    marginTop:         SPACE_4,
+    paddingTop:        SPACE_2,
+    borderTopWidth:    BORDER_WIDTH,
+    borderTopColor:    LCD_SHADE2,
+  },
+  socialLeft: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    flexShrink:    1,
+  },
+  presenceDot: {
+    width:           PIXEL * 3,
+    height:          PIXEL * 3,
+    backgroundColor: LCD_DARK,
+    marginRight:     SPACE_2,
   },
 });

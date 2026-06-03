@@ -36,9 +36,30 @@ export interface PetActions {
   feed(): void;                                      // cat/dog
   play(): void;                                      // cat/dog
   water(): void;                                     // plant
+  socialize(): void;                                 // any — boost from meeting a nearby pet
   selectType(petType: PetType, name?: string): void; // create / restart a pet
   reset(): void;                                     // clear pet → back to selection
   rename(name: string): void;
+}
+
+// ─── Social / nearby ──────────────────────────────────────────────────────────
+// A pet broadcasts a tiny identity over BLE; the parts that survive iOS's
+// advertisement size limits. `id` is a stable per-device id, NOT the pet save —
+// renaming or restarting your pet keeps the same identity so friends persist.
+export interface PeerIdentity {
+  id: string;        // stable device id (8 hex chars)
+  name: string;      // pet name (truncated for the air)
+  petType: PetType;
+}
+
+/** A pet you've met nearby, remembered locally. Keyed by PeerIdentity.id. */
+export interface Friend {
+  id: string;
+  name: string;
+  petType: PetType;
+  firstMetAt: number; // epoch ms
+  lastMetAt: number;  // epoch ms
+  meetCount: number;  // distinct encounters (cooldown-gated)
 }
 
 export interface UsePet {

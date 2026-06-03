@@ -6,6 +6,7 @@ import {
   rename,
   restart,
   simulate,
+  socialize,
   water,
 } from './engine';
 import {
@@ -270,6 +271,42 @@ describe('restart', () => {
   it('keeps the existing name when none is given', () => {
     const dead = freshPet('dog', { isDead: true, name: 'OldPet' });
     expect(restart(dead, NOW).name).toBe('OldPet');
+  });
+});
+
+// ─── socialize (nearby meet boost) ────────────────────────────────────────────
+
+describe('socialize', () => {
+  it.each<PetType>(['cat', 'dog'])('boosts %s happiness and health, clamped', (petType) => {
+    const pet = freshPet(petType, {
+      stats: { hunger: 60, happiness: 40, health: 50, water: 100 },
+    });
+    const next = socialize(pet, NOW);
+    expect(next.stats.happiness).toBeGreaterThan(40);
+    expect(next.stats.health).toBeGreaterThan(50);
+    expect(next.stats.happiness).toBeLessThanOrEqual(100);
+    expect(next.stats.health).toBeLessThanOrEqual(100);
+  });
+
+  it('boosts plant water, clamped at 100', () => {
+    const pet = freshPet('plant', {
+      stats: { hunger: 80, happiness: 80, health: 100, water: 40 },
+    });
+    expect(socialize(pet, NOW).stats.water).toBeGreaterThan(40);
+
+    const full = freshPet('plant', {
+      stats: { hunger: 80, happiness: 80, health: 100, water: 95 },
+    });
+    expect(socialize(full, NOW).stats.water).toBeLessThanOrEqual(100);
+  });
+
+  it('does nothing when dead', () => {
+    const dead = freshPet('cat', {
+      isDead: true,
+      stats: { hunger: 0, happiness: 0, health: 0, water: 100 },
+    });
+    expect(socialize(dead, NOW).stats.happiness).toBe(0);
+    expect(socialize(dead, NOW).stats.health).toBe(0);
   });
 });
 

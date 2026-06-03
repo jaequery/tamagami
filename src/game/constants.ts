@@ -51,3 +51,20 @@ export const WATER_BOOST = 35;            // +35 water per watering
 export const NOTIFY_HUNGER_THRESHOLD = 20;
 export const NOTIFY_HAPPINESS_THRESHOLD = 20;
 export const NOTIFY_WATER_THRESHOLD = 25;
+
+// ─── Nearby / social ─────────────────────────────────────────────────────────
+// When two TAMAGAMI pets meet over BLE, the local pet gets a one-off "social"
+// boost. Effects mirror the care model: animals cheer up (+happiness, a little
+// +health); a plant gets a small +water (a friend tends it).
+export const SOCIAL_HAPPINESS_BOOST = 20; // cat/dog
+export const SOCIAL_HEALTH_BOOST = 5;     // cat/dog
+export const SOCIAL_WATER_BOOST = 15;     // plant
+
+// A given peer can only boost this pet once per cooldown window — stops two
+// phones sitting on a desk together from pinning every stat to 100.
+export const SOCIAL_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes per peer
+
+// AsyncStorage keys for the social layer (independent of the pet save, so a pet
+// reset never wipes your friends or your stable device identity).
+export const DEVICE_ID_KEY = '@tama/deviceId/v1';
+export const FRIENDS_KEY = '@tama/friends/v1';

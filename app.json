@@ -14,7 +14,8 @@
         "com.apple.security.application-groups": ["group.com.tamagami.app"]
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSBluetoothAlwaysUsageDescription": "TAMAGAMI uses Bluetooth to let your pet meet other TAMAGAMI pets nearby."
       }
     },
     "android": {

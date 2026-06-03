@@ -16,6 +16,9 @@ import {
   NOTIFY_WATER_THRESHOLD,
   PLAY_HAPPINESS_BOOST,
   PLAY_HUNGER_COST,
+  SOCIAL_HAPPINESS_BOOST,
+  SOCIAL_HEALTH_BOOST,
+  SOCIAL_WATER_BOOST,
   WATER_BOOST,
   WATER_DECAY_PER_SECOND,
 } from './constants';
@@ -166,6 +169,36 @@ export function water(state: PetState, now: number): PetState {
     stats: {
       ...simulated.stats,
       water: clamp(simulated.stats.water + WATER_BOOST),
+    },
+  };
+}
+
+/**
+ * Social boost from meeting another TAMAGAMI pet nearby. Animals cheer up
+ * (+happiness, a little +health); a plant gets a small +water. Cooldown gating
+ * lives in the friends layer — this reducer just applies the effect.
+ */
+export function socialize(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead) return simulated;
+
+  if (isAnimal(simulated.petType)) {
+    return {
+      ...simulated,
+      stats: {
+        ...simulated.stats,
+        happiness: clamp(simulated.stats.happiness + SOCIAL_HAPPINESS_BOOST),
+        health: clamp(simulated.stats.health + SOCIAL_HEALTH_BOOST),
+      },
+    };
+  }
+
+  // plant
+  return {
+    ...simulated,
+    stats: {
+      ...simulated.stats,
+      water: clamp(simulated.stats.water + SOCIAL_WATER_BOOST),
     },
   };
 }
