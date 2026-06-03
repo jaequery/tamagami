@@ -5,6 +5,7 @@ import {
   SafeAreaView,
   Animated,
   TouchableOpacity,
+  Alert,
   StyleSheet,
 } from 'react-native';
 import type { CauseOfDeath, Mood, PetActions, PetState } from '../game/types';
@@ -209,6 +210,19 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
 
   const handleRestart = useCallback(() => actions.reset(), [actions]);
 
+  // Change pet = wipe the current one and return to the selection screen.
+  // Destructive, so gate behind a native confirm.
+  const handleChangePet = useCallback(() => {
+    Alert.alert(
+      'Change pet?',
+      `${pet.name.toUpperCase()} will be released. This can't be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Change pet', style: 'destructive', onPress: () => actions.reset() },
+      ],
+    );
+  }, [actions, pet.name]);
+
   // ── Nearby (BLE) social loop ──
   const { supported, bluetoothState, nearby, friends, meet, clearMeet } = useNearby(
     pet,
@@ -251,9 +265,22 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 </PixelText>
                 {isCritical && !pet.isDead && <CriticalIndicator />}
               </View>
-              <PixelText variant="tiny" color={LCD_SHADE2}>
-                {profile.title} {formatAge(pet.ageSeconds)}
-              </PixelText>
+              <View style={styles.topRight}>
+                <PixelText variant="tiny" color={LCD_SHADE2}>
+                  {profile.title} {formatAge(pet.ageSeconds)}
+                </PixelText>
+                {!pet.isDead && (
+                  <TouchableOpacity
+                    onPress={handleChangePet}
+                    hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Change pet — release this one and pick a new type"
+                    style={styles.changeBtn}
+                  >
+                    <PixelText variant="tiny" color={LCD_DARK}>[CHANGE]</PixelText>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
 
             {/* ── Pet sprite ── */}
@@ -359,6 +386,13 @@ const styles = StyleSheet.create({
   topLeft: {
     flexDirection: 'row',
     alignItems:    'center',
+  },
+  topRight: {
+    flexDirection: 'row',
+    alignItems:    'center',
+  },
+  changeBtn: {
+    marginLeft: SPACE_4,
   },
   petName: {
     maxWidth: 120,
