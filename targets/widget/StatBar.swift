@@ -5,15 +5,15 @@
 import SwiftUI
 
 // MARK: - Palette (mirrors Sprite.swift; re-declared locally as file-private)
-private let SEG_LCD_GREEN  = Color(red: 0x9B/255.0, green: 0xBC/255.0, blue: 0x0F/255.0)  // #9BBC0F
-private let SEG_LCD_DARK   = Color(red: 0x0F/255.0, green: 0x38/255.0, blue: 0x0F/255.0)  // #0F380F
-private let SEG_WARNING    = Color(red: 0xD8/255.0, green: 0x77/255.0, blue: 0x00/255.0)  // orange
-private let SEG_CRITICAL   = Color(red: 0x8B/255.0, green: 0x00/255.0, blue: 0x00/255.0)  // dark-red
+private let SEG_INK      = Color(red: 0x0F/255.0, green: 0x38/255.0, blue: 0x0F/255.0)  // #0F380F dark — label, value, healthy fill
+private let SEG_OFF       = Color(red: 0x7A/255.0, green: 0xA8/255.0, blue: 0x0A/255.0)  // #7AA80A unpowered empty segment
+private let SEG_WARNING    = Color(red: 0xC4/255.0, green: 0x4B/255.0, blue: 0x00/255.0)  // #C44B00 warn orange
+private let SEG_CRITICAL   = Color(red: 0x8B/255.0, green: 0x00/255.0, blue: 0x00/255.0)  // #8B0000 dark-red
 
 private func segColor(for value: Double) -> Color {
     if value <= 10 { return SEG_CRITICAL }
     if value <  30 { return SEG_WARNING }
-    return SEG_LCD_GREEN
+    return SEG_INK
 }
 
 // MARK: - StatBar
@@ -36,7 +36,7 @@ struct StatBar: View {
         HStack(spacing: 3) {
             Text(label)
                 .font(.system(size: 6, weight: .bold, design: .monospaced))
-                .foregroundColor(SEG_LCD_GREEN)
+                .foregroundColor(SEG_INK)
                 .frame(width: labelWidth, alignment: .leading)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -44,7 +44,7 @@ struct StatBar: View {
             HStack(spacing: spacing) {
                 ForEach(0..<segments, id: \.self) { idx in
                     RoundedRectangle(cornerRadius: 1)
-                        .fill(idx < filled ? segColor(for: value) : SEG_LCD_DARK)
+                        .fill(idx < filled ? segColor(for: value) : SEG_OFF)
                         .frame(width: segWidth, height: segHeight)
                 }
             }
@@ -75,14 +75,14 @@ struct CompactStatBar: View {
         HStack(spacing: 2) {
             Text(label)
                 .font(.system(size: 5.5, weight: .bold, design: .monospaced))
-                .foregroundColor(SEG_LCD_GREEN)
+                .foregroundColor(SEG_INK)
                 .frame(width: labelWidth, alignment: .leading)
                 .lineLimit(1)
 
             HStack(spacing: 1) {
                 ForEach(0..<segments, id: \.self) { idx in
                     RoundedRectangle(cornerRadius: 0.5)
-                        .fill(idx < filled ? segColor(for: value) : SEG_LCD_DARK)
+                        .fill(idx < filled ? segColor(for: value) : SEG_OFF)
                         .frame(width: 5, height: 5)
                 }
             }

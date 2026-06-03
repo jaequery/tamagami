@@ -8,9 +8,9 @@ import SwiftUI
 
 // MARK: - Palette constants (shared by views in this file)
 
-private let LCD_BG_COLOR   = Color(red: 0x0F/255.0, green: 0x38/255.0, blue: 0x0F/255.0)
-private let LCD_GREEN_COLOR = Color(red: 0x9B/255.0, green: 0xBC/255.0, blue: 0x0F/255.0)
-private let LCD_MID_COLOR  = Color(red: 0x30/255.0, green: 0x62/255.0, blue: 0x30/255.0)
+private let LCD_BG_COLOR  = Color(red: 0x9B/255.0, green: 0xBC/255.0, blue: 0x0F/255.0)  // lime screen (matches app)
+private let LCD_INK_COLOR = Color(red: 0x0F/255.0, green: 0x38/255.0, blue: 0x0F/255.0)  // dark ink — name/RIP text
+private let LCD_DIM_COLOR = Color(red: 0x30/255.0, green: 0x62/255.0, blue: 0x30/255.0)  // mid green — secondary text
 
 // MARK: - systemSmall view
 
@@ -53,11 +53,11 @@ struct SmallWidgetView: View {
             // Name + type
             Text(state.name)
                 .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundColor(LCD_GREEN_COLOR)
+                .foregroundColor(LCD_INK_COLOR)
                 .lineLimit(1)
             Text("\(state.petType.title) · \(ageLabel(state.ageSeconds))")
                 .font(.system(size: 6, weight: .regular, design: .monospaced))
-                .foregroundColor(LCD_MID_COLOR)
+                .foregroundColor(LCD_DIM_COLOR)
                 .lineLimit(1)
 
             Spacer(minLength: 2)
@@ -80,10 +80,10 @@ struct SmallWidgetView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             Text("R.I.P.")
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundColor(LCD_GREEN_COLOR)
+                .foregroundColor(LCD_INK_COLOR)
             Text(state.name)
                 .font(.system(size: 7, weight: .regular, design: .monospaced))
-                .foregroundColor(LCD_MID_COLOR)
+                .foregroundColor(LCD_DIM_COLOR)
                 .lineLimit(1)
         }
         .padding(6)
@@ -132,15 +132,15 @@ struct MediumWidgetView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(state.name)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(LCD_GREEN_COLOR)
+                    .foregroundColor(LCD_INK_COLOR)
                     .lineLimit(1)
                 Text("\(state.petType.title)  \(ageLabel(state.ageSeconds))")
                     .font(.system(size: 7, weight: .regular, design: .monospaced))
-                    .foregroundColor(LCD_MID_COLOR)
+                    .foregroundColor(LCD_DIM_COLOR)
                     .lineLimit(1)
 
                 Divider()
-                    .background(LCD_MID_COLOR)
+                    .background(LCD_DIM_COLOR)
                     .padding(.vertical, 1)
 
                 ForEach(Array(statBars(for: state).enumerated()), id: \.offset) { _, stat in
@@ -161,15 +161,15 @@ struct MediumWidgetView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("R.I.P. \(state.name)")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(LCD_GREEN_COLOR)
+                    .foregroundColor(LCD_INK_COLOR)
                 if let cause = state.causeOfDeath {
                     Text("Cause: \(cause.rawValue)")
                         .font(.system(size: 8, weight: .regular, design: .monospaced))
-                        .foregroundColor(LCD_MID_COLOR)
+                        .foregroundColor(LCD_DIM_COLOR)
                 }
                 Text("Age: \(ageLabel(state.ageSeconds))")
                     .font(.system(size: 8, weight: .regular, design: .monospaced))
-                    .foregroundColor(LCD_MID_COLOR)
+                    .foregroundColor(LCD_DIM_COLOR)
             }
         }
     }

@@ -39,7 +39,7 @@ export function DeviceFrame({ children }: DeviceFrameProps): React.ReactElement 
       {/* Top brand / title strip */}
       <View style={styles.topStrip}>
         <PixelText variant="tiny" color={COLOR_TEXT_ON_SHELL} style={styles.brandText}>
-          TAMAGOTCHA
+          TAMAGAMI
         </PixelText>
       </View>
 

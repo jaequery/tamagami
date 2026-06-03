@@ -8,13 +8,13 @@ import SwiftUI
 // MARK: - Palette
 // Game Boy LCD palette. Index 0 = transparent (rendered as LCD_BG).
 
-private let LCD_BG    = Color(hex: "#0F380F")  // darkest
-private let LCD_DARK  = Color(hex: "#0F380F")  // same as bg for outline pixels
+private let LCD_BG    = Color(hex: "#9BBC0F")  // lime screen background (matches app)
+private let LCD_DARK  = Color(hex: "#0F380F")  // darkest pixel / outline + eyes
 private let LCD_MID   = Color(hex: "#306230")  // mid green
 private let LCD_LIGHT = Color(hex: "#8BAC0F")  // light green
-private let LCD_LCD   = Color(hex: "#9BBC0F")  // brightest / LCD green
 private let WHITE     = Color.white
-private let ORANGE    = Color(hex: "#D87700")  // sick/warning
+private let WARNING   = Color(hex: "#C44B00")  // sick / warning
+private let SHELL     = Color(hex: "#3DA39F")  // shell accent (teal highlight)
 private let TEAR_GRN  = Color(hex: "#306230")  // dark-green tear (same as mid)
 
 private func paletteColor(_ index: Int) -> Color {
@@ -24,8 +24,8 @@ private func paletteColor(_ index: Int) -> Color {
     case 2: return LCD_MID
     case 3: return LCD_LIGHT
     case 4: return WHITE
-    case 5: return ORANGE
-    case 6: return LCD_LCD
+    case 5: return WARNING
+    case 6: return SHELL
     case 7: return TEAR_GRN
     default: return LCD_BG
     }
