@@ -62,6 +62,15 @@ function validatePetState(parsed: unknown): PetState | null {
     events = (p.events as string[]).slice(0, 50);
   }
 
+  // ── generation: tolerant ──────────────────────────────────────────────────
+  // Added with the lineage system after v3 shipped. Missing → a founder (gen 1).
+  // Reject only present-but-invalid so a bad value can't break the family tree.
+  let generation = 1;
+  if (p.generation !== undefined) {
+    if (!isFiniteInRange(p.generation, 1, Number.MAX_SAFE_INTEGER)) return null;
+    generation = Math.floor(p.generation as number);
+  }
+
   // All fields valid — construct the typed return value without an unsafe cast
   return {
     version: p.version as number,
@@ -74,6 +83,7 @@ function validatePetState(parsed: unknown): PetState | null {
     isDead: p.isDead as boolean,
     causeOfDeath: p.causeOfDeath as PetState['causeOfDeath'],
     events,
+    generation,
     stats: {
       hunger: s.hunger as number,
       happiness: s.happiness as number,

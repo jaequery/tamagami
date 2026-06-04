@@ -44,6 +44,7 @@ export interface PetState {
   causeOfDeath: CauseOfDeath;
   ageSeconds: number;    // total seconds alive
   events: string[];      // world-event ids this pet has witnessed (its aura). See game/events.ts
+  generation: number;    // 1 for a founder; +1 for each heir that continues the line
 }
 
 export interface PetActions {
@@ -52,6 +53,7 @@ export interface PetActions {
   water(): void;                                     // plant
   socialize(): void;                                 // any — boost from meeting a nearby pet
   witnessEvent(eventId: string): void;               // any — record a live world event onto the pet
+  continueLine(): void;                              // dead pet → hatch an heir that inherits the line
   selectType(petType: PetType, name?: string): void; // create / restart a pet
   reset(): void;                                     // clear pet → back to selection
   rename(name: string): void;

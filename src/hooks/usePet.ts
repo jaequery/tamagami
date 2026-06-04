@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
+  createHeir,
   createInitialPet,
   feed,
   getMood,
@@ -11,6 +12,7 @@ import {
   water,
   witnessEvent,
 } from '../game/engine';
+import { appendAncestor, ancestorFrom } from '../game/lineage';
 import { initNotifications, rescheduleCareNotifications } from '../game/notifications';
 import { clearPet, loadPet, savePet } from '../game/storage';
 import { clearWidget, syncWidget } from '../game/widget';
@@ -165,11 +167,24 @@ export function usePet(): UsePet {
     applyState(witnessEvent(petRef.current, eventId, Date.now()), true);
   }, [applyState]);
 
+  // Death → continue the bloodline: archive the departed as an ancestor, then
+  // hatch its heir (next generation, inherited rarity) in place — no trip back
+  // to the selection screen.
+  const actionContinueLine = useCallback(() => {
+    const cur = petRef.current;
+    if (cur === null || !cur.isDead) return;
+    void appendAncestor(ancestorFrom(cur));
+    applyState(createHeir(cur, Date.now()), true);
+  }, [applyState]);
+
   const actionSelectType = useCallback((petType: PetType, name?: string) => {
     applyState(createInitialPet(name ?? 'Pixel', petType, Date.now()), true);
   }, [applyState]);
 
   const actionReset = useCallback(() => {
+    // Starting fresh still records the departed in the family tree before wiping.
+    const cur = petRef.current;
+    if (cur !== null && cur.isDead) void appendAncestor(ancestorFrom(cur));
     stopTick();
     setPet(null);
     petRef.current = null;
@@ -189,10 +204,11 @@ export function usePet(): UsePet {
     water: actionWater,
     socialize: actionSocialize,
     witnessEvent: actionWitnessEvent,
+    continueLine: actionContinueLine,
     selectType: actionSelectType,
     reset: actionReset,
     rename: actionRename,
-  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionSelectType, actionReset, actionRename]);
+  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionContinueLine, actionSelectType, actionReset, actionRename]);
 
   return {
     pet,

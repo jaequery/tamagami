@@ -1,6 +1,6 @@
 import type { CauseOfDeath, Mood, PetState, PetType } from './types';
 import { isAnimal } from './profiles';
-import { rollRarity } from './evolution';
+import { rollRarity, rollHeirRarity } from './evolution';
 import {
   CURRENT_VERSION,
   FEED_HAPPINESS_DELTA,
@@ -59,6 +59,22 @@ export function createInitialPet(name: string, petType: PetType, now: number): P
     causeOfDeath: null,
     ageSeconds: 0,
     events: [],
+    generation: 1,
+  };
+}
+
+/**
+ * Create the heir to a (usually dead) pet: same species and family name, next
+ * generation, with an inherited rarity roll that's biased toward the parent's
+ * luck (see rollHeirRarity). The heir starts fresh as its own egg — death isn't
+ * game-over, it's the next chapter of the line.
+ */
+export function createHeir(parent: PetState, now: number): PetState {
+  const base = createInitialPet(parent.name, parent.petType, now);
+  return {
+    ...base,
+    rarity: rollHeirRarity(now, base.name, parent.petType, parent.rarity),
+    generation: (parent.generation ?? 1) + 1,
   };
 }
 

@@ -26,6 +26,7 @@ import { loadDiscovered, recordDiscovered } from '../game/codex';
 import { phaseOfDay, phaseLabel } from '../game/world';
 import { activeEventAt, eventById, type GameEvent } from '../game/events';
 import { loadWitnessed, recordWitnessed } from '../game/eventCodex';
+import { loadLineage, epitaphFor, type Ancestor } from '../game/lineage';
 import { useNearby } from '../hooks/useNearby';
 import { DeviceFrame } from '../components/DeviceFrame';
 import { PetSprite } from '../components/PetSprite';
@@ -39,6 +40,7 @@ import { ShareCard } from '../components/ShareCard';
 import { CodexModal } from '../components/CodexModal';
 import { EventBanner } from '../components/EventBanner';
 import { EventReveal } from '../components/EventReveal';
+import { LineageModal } from '../components/LineageModal';
 import {
   LCD_BG,
   LCD_DARK,
@@ -126,31 +128,44 @@ const critStyles = StyleSheet.create({
 // ─── Death Overlay ───────────────────────────────────────────────────────────
 
 interface DeathOverlayProps {
-  petType:   import('../game/types').PetType;
-  cause:     CauseOfDeath;
-  onRestart: () => void;
+  pet:            PetState;
+  onContinueLine: () => void;
+  onShare:        () => void;
+  onNewPet:       () => void;
 }
 
-function DeathOverlay({ petType, cause, onRestart }: DeathOverlayProps): React.ReactElement {
+function DeathOverlay({ pet, onContinueLine, onShare, onNewPet }: DeathOverlayProps): React.ReactElement {
+  const epitaph = epitaphFor(pet.name, pet.bornAt);
   return (
     <View style={deathStyles.overlay} accessible accessibilityLabel="Your pet has died">
       <View style={deathStyles.ghostContainer}>
-        <PetSprite petType={petType} mood="dead" />
+        <PetSprite petType={pet.petType} mood="dead" />
       </View>
 
       <PixelText variant="md" color={LCD_DARK} style={deathStyles.title}>
         R.I.P.
       </PixelText>
+      <PixelText variant="sm" color={LCD_DARK} numberOfLines={1} style={deathStyles.cause}>
+        {pet.name.toUpperCase()} · GEN {pet.generation}
+      </PixelText>
       <PixelText variant="sm" color={LCD_SHADE2} style={deathStyles.cause}>
-        CAUSE: {causeOfDeathLabel(cause)}
+        CAUSE: {causeOfDeathLabel(pet.causeOfDeath)}
+      </PixelText>
+      <PixelText variant="tiny" color={LCD_SHADE2} style={deathStyles.epitaph}>
+        &quot;{epitaph}&quot;
       </PixelText>
 
-      <View style={deathStyles.buttonRow}>
+      <View style={deathStyles.continueRow}>
         <PixelButton
-          label="NEW PET"
-          onPress={onRestart}
-          accessibilityLabel="Start over with a new pet"
+          label="CONTINUE LINE"
+          glyph=">"
+          onPress={onContinueLine}
+          accessibilityLabel="Continue the bloodline — hatch an heir that inherits this pet's traits"
         />
+      </View>
+      <View style={deathStyles.buttonRow}>
+        <PixelButton label="SHARE" onPress={onShare} accessibilityLabel="Share a tombstone card" />
+        <PixelButton label="NEW PET" onPress={onNewPet} accessibilityLabel="Start a fresh new pet" />
       </View>
     </View>
   );
@@ -172,7 +187,17 @@ const deathStyles = StyleSheet.create({
     marginBottom: SPACE_6,
   },
   cause: {
+    marginBottom: SPACE_2,
+    textAlign:    'center',
+  },
+  epitaph: {
+    marginTop:    SPACE_2,
     marginBottom: SPACE_8,
+    textAlign:    'center',
+  },
+  continueRow: {
+    flexDirection: 'row',
+    marginBottom:  SPACE_2,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -346,6 +371,15 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
 
   const handleEventRevealDone = useCallback(() => setEventReveal(null), []);
 
+  // ── Lineage (family tree) — loaded fresh on open so heirs appear immediately ──
+  const [lineage, setLineage] = useState<Ancestor[]>([]);
+  const [treeOpen, setTreeOpen] = useState(false);
+  const handleOpenTree = useCallback(() => {
+    void loadLineage().then(setLineage);
+    setTreeOpen(true);
+  }, []);
+  const handleCloseTree = useCallback(() => setTreeOpen(false), []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -480,6 +514,14 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 <PixelText variant="tiny" color={LCD_DARK}>[SHARE]</PixelText>
               </TouchableOpacity>
               <TouchableOpacity
+                onPress={handleOpenTree}
+                hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Open family tree, generation ${pet.generation}`}
+              >
+                <PixelText variant="tiny" color={LCD_DARK}>GEN {pet.generation}</PixelText>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={handleOpenCodex}
                 hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
                 accessibilityRole="button"
@@ -512,9 +554,10 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
             {/* ── Death Overlay ── */}
             {pet.isDead && (
               <DeathOverlay
-                petType={pet.petType}
-                cause={pet.causeOfDeath}
-                onRestart={handleRestart}
+                pet={pet}
+                onContinueLine={actions.continueLine}
+                onShare={handleOpenShare}
+                onNewPet={handleRestart}
               />
             )}
           </View>
@@ -555,6 +598,8 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
           onDone={handleEventRevealDone}
         />
       )}
+
+      <LineageModal visible={treeOpen} lineage={lineage} current={pet} onClose={handleCloseTree} />
     </SafeAreaView>
   );
 }

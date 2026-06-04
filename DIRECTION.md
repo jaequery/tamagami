@@ -52,8 +52,9 @@ don't know how to unlock. That gap is the game.
 - **Phase 2 — SHIPPED (living world):** day/night phase + three deterministic timed
   events (eclipse / 3am visitor / meteor shower) the pet can witness; witnessing stamps a
   permanent aura and fills an EVENTS page in the codex. Details below.
-- **Phase 3 — Death legacy:** tombstone card, inherited egg, family tree. (Hook already
-  exists: death has a cause.)
+- **Phase 3 — SHIPPED (death legacy):** death now offers CONTINUE LINE (hatch an heir
+  that inherits the bloodline's luck), a tombstone share card, and a family tree of every
+  generation. Details below.
 - **Phase 4 — Social graph:** rare-meet odds, co-evolution, bond web.
 
 ## Phase 1 — what's actually built
@@ -93,6 +94,23 @@ the `events` field is tolerant, so the v3 saves already on TestFlight stay valid
 **Event windows (local time):** meteor 21:00–05:00 nightly · 3am visitor 03:00–03:59 ·
 solar eclipse 12:00–12:59 on eclipse days (~1 in 6). To demo any of them without waiting,
 set the device clock — e.g. 3am for the visitor (genre-authentic clock-chasing).
+
+## Phase 3 — what's built (death legacy + lineage)
+
+Code map (additive; **no save-version bump** — `generation` is tolerant like `events`):
+
+- `src/game/lineage.ts` — the family-tree store (permanent graves, save-independent),
+  `ancestorFrom`, and deterministic `epitaphFor`.
+- `evolution.ts` — `rarityRank` / `rarer` / `rollHeirRarity`: an heir takes the rarer of
+  two rolls and 25% of the time floors at the parent's rarity, so a line "remembers its
+  luck" (a secret bloodline reaches secret far more than a fresh 1% roll).
+- `engine.createHeir` — same species + family name, next generation, inherited rarity,
+  fresh egg. `PetState.generation` (tolerant in storage).
+- `usePet` — `actions.continueLine` archives the departed and hatches the heir in place;
+  `reset` also archives before a fresh start, so the tree never forgets.
+- Death overlay now offers **CONTINUE LINE / SHARE / NEW PET** with the epitaph; the
+  share card has a tombstone variant (R.I.P., cause, epitaph, GEN); `GEN n` in the meta
+  bar opens the **family tree** (`LineageModal`).
 
 ### Tunables worth knowing
 

@@ -69,6 +69,37 @@ export function rollRarity(bornAt: number, name: string, petType: PetType): Rari
   return rarityFromUnit(hashUnit(raritySeed(bornAt, name, petType)));
 }
 
+// ─── Rarity ordering + inheritance ────────────────────────────────────────────
+
+/** 0 (common) … 4 (secret). */
+export function rarityRank(rarity: Rarity): number {
+  return RARITIES.indexOf(rarity);
+}
+
+/** The rarer of two rarities. */
+export function rarer(a: Rarity, b: Rarity): Rarity {
+  return rarityRank(a) >= rarityRank(b) ? a : b;
+}
+
+/**
+ * Heir rarity for a continued bloodline. The line "remembers its luck": the heir
+ * takes the rarer of two independent rolls, and 25% of the time also floors at
+ * the parent's rarity — so a line that once reached a rare form is much likelier
+ * to see it again, and a secret line stays special. Deterministic.
+ */
+export function rollHeirRarity(
+  bornAt: number,
+  name: string,
+  petType: PetType,
+  parentRarity: Rarity,
+): Rarity {
+  const a = rollRarity(bornAt, name, petType);
+  const b = rarityFromUnit(hashUnit(`heir:${bornAt}:${petType}:${name}`));
+  let best = rarer(a, b);
+  if (hashUnit(`inherit:${bornAt}:${name}`) < 0.25) best = rarer(best, parentRarity);
+  return best;
+}
+
 // ─── Life-stage thresholds ────────────────────────────────────────────────────
 // Lower bound (in ageSeconds) at which each stage begins. Tunable. EGG hatches
 // at 45s on purpose: the first reveal must land in the opening session or the

@@ -10,15 +10,17 @@
 import React, { useCallback, useRef } from 'react';
 import { Modal, View, Share, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import type { PetState } from '../game/types';
+import type { CauseOfDeath, PetState } from '../game/types';
 import { paletteForRarity, rarityAccent } from '../game/palettes';
 import { formName, rarityLabel, stageFor } from '../game/evolution';
 import { eventById } from '../game/events';
+import { epitaphFor } from '../game/lineage';
 import { PetSprite } from './PetSprite';
 import { PixelText } from './PixelText';
 import { PixelButton } from './PixelButton';
 import {
   COLOR_OVERLAY,
+  COLOR_WARNING,
   LCD_BG,
   LCD_DARK,
   LCD_SHADE2,
@@ -40,6 +42,15 @@ interface ShareCardProps {
   onClose: () => void;
 }
 
+function causeLabel(cause: CauseOfDeath): string {
+  switch (cause) {
+    case 'starvation': return 'STARVATION';
+    case 'thirst':     return 'THIRST';
+    case 'neglect':    return 'NEGLECT';
+    default:           return 'UNKNOWN';
+  }
+}
+
 function formatAge(seconds: number): string {
   if (seconds < 60) return `${Math.floor(seconds)}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
@@ -58,17 +69,21 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
     .map((id) => eventById(id))
     .filter((e): e is NonNullable<ReturnType<typeof eventById>> => e !== null);
 
+  const epitaph = epitaphFor(pet.name, pet.bornAt);
+
   const handleShare = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     const deepLink = `tamagami://hatch?type=${pet.petType}&rarity=${pet.rarity}`;
     const touched = auraEvents.length > 0
       ? ` Touched by: ${auraEvents.map((e) => e.name).join(', ')}.`
       : '';
-    const message =
-      `${name} the ${form} — ${ageLabel} old and ${pet.isDead ? 'gone' : 'thriving'} on TAMAGAMI.${touched}\n` +
-      `Hatch your own mystery pet: ${deepLink}`;
+    const message = pet.isDead
+      ? `R.I.P. ${name} the ${form} — gen ${pet.generation}, lived ${ageLabel}, lost to ${causeLabel(pet.causeOfDeath).toLowerCase()}. "${epitaph}".${touched}\n`
+        + `Raise your own on TAMAGAMI: ${deepLink}`
+      : `${name} the ${form} — ${ageLabel} old and thriving on TAMAGAMI (gen ${pet.generation}).${touched}\n`
+        + `Hatch your own mystery pet: ${deepLink}`;
     Share.share({ message }).catch(() => undefined);
-  }, [name, form, ageLabel, auraEvents, pet.petType, pet.rarity, pet.isDead]);
+  }, [name, form, ageLabel, auraEvents, epitaph, pet.petType, pet.rarity, pet.isDead, pet.generation, pet.causeOfDeath]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -93,6 +108,10 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
             />
           </View>
 
+          {pet.isDead && (
+            <PixelText variant="md" color={COLOR_WARNING} style={styles.rip}>R.I.P.</PixelText>
+          )}
+
           <PixelText variant="lg" color={LCD_DARK} numberOfLines={1} style={styles.name}>
             {name}
           </PixelText>
@@ -107,8 +126,15 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
           </View>
 
           <PixelText variant="tiny" color={LCD_SHADE2} style={styles.age}>
-            AGE {ageLabel} · {stage.toUpperCase()}
+            AGE {ageLabel} · {stage.toUpperCase()} · G{pet.generation}
           </PixelText>
+
+          {pet.isDead && (
+            <View style={styles.epitaphBlock}>
+              <PixelText variant="tiny" color={COLOR_WARNING}>CAUSE: {causeLabel(pet.causeOfDeath)}</PixelText>
+              <PixelText variant="tiny" color={LCD_SHADE2} style={styles.epitaph}>&quot;{epitaph}&quot;</PixelText>
+            </View>
+          )}
 
           {auraEvents.length > 0 && (
             <View style={styles.auraRow}>
@@ -174,9 +200,22 @@ const styles = StyleSheet.create({
     borderColor: SCREEN_INSET,
     marginBottom: SPACE_6,
   },
+  rip: {
+    textAlign: 'center',
+    letterSpacing: 2,
+    marginBottom: SPACE_2,
+  },
   name: {
     textAlign: 'center',
     marginBottom: SPACE_4,
+  },
+  epitaphBlock: {
+    alignItems: 'center',
+    marginBottom: SPACE_4,
+  },
+  epitaph: {
+    marginTop: SPACE_2,
+    textAlign: 'center',
   },
   metaRow: {
     flexDirection: 'row',
