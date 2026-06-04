@@ -58,6 +58,7 @@ export function createInitialPet(name: string, petType: PetType, now: number): P
     isDead: false,
     causeOfDeath: null,
     ageSeconds: 0,
+    events: [],
   };
 }
 
@@ -204,6 +205,17 @@ export function socialize(state: PetState, now: number): PetState {
       water: clamp(simulated.stats.water + SOCIAL_WATER_BOOST),
     },
   };
+}
+
+/**
+ * Stamp a live world event onto the pet (its permanent aura). Idempotent: a pet
+ * can only carry a given event once, no matter how many times it's witnessed.
+ * Simulates first so witnessing also advances the clock; a dead pet can't witness.
+ */
+export function witnessEvent(state: PetState, eventId: string, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || simulated.events.includes(eventId)) return simulated;
+  return { ...simulated, events: [...simulated.events, eventId] };
 }
 
 export function restart(state: PetState, now: number, petType?: PetType, name?: string): PetState {

@@ -13,11 +13,13 @@ import * as Haptics from 'expo-haptics';
 import type { PetState } from '../game/types';
 import { paletteForRarity, rarityAccent } from '../game/palettes';
 import { formName, rarityLabel, stageFor } from '../game/evolution';
+import { eventById } from '../game/events';
 import { PetSprite } from './PetSprite';
 import { PixelText } from './PixelText';
 import { PixelButton } from './PixelButton';
 import {
   COLOR_OVERLAY,
+  LCD_BG,
   LCD_DARK,
   LCD_SHADE2,
   SCREEN_INSET,
@@ -52,15 +54,21 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
   const name = pet.name.toUpperCase();
   const form = formName(pet.petType, pet.rarity);
   const ageLabel = formatAge(pet.ageSeconds);
+  const auraEvents = pet.events
+    .map((id) => eventById(id))
+    .filter((e): e is NonNullable<ReturnType<typeof eventById>> => e !== null);
 
   const handleShare = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     const deepLink = `tamagami://hatch?type=${pet.petType}&rarity=${pet.rarity}`;
+    const touched = auraEvents.length > 0
+      ? ` Touched by: ${auraEvents.map((e) => e.name).join(', ')}.`
+      : '';
     const message =
-      `${name} the ${form} — ${ageLabel} old and ${pet.isDead ? 'gone' : 'thriving'} on TAMAGAMI.\n` +
+      `${name} the ${form} — ${ageLabel} old and ${pet.isDead ? 'gone' : 'thriving'} on TAMAGAMI.${touched}\n` +
       `Hatch your own mystery pet: ${deepLink}`;
     Share.share({ message }).catch(() => undefined);
-  }, [name, form, ageLabel, pet.petType, pet.rarity, pet.isDead]);
+  }, [name, form, ageLabel, auraEvents, pet.petType, pet.rarity, pet.isDead]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -101,6 +109,16 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
           <PixelText variant="tiny" color={LCD_SHADE2} style={styles.age}>
             AGE {ageLabel} · {stage.toUpperCase()}
           </PixelText>
+
+          {auraEvents.length > 0 && (
+            <View style={styles.auraRow}>
+              {auraEvents.map((ev) => (
+                <View key={ev.id} style={styles.auraChip}>
+                  <PixelText variant="tiny" color={LCD_BG}>✦ {ev.short}</PixelText>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.divider} />
 
@@ -176,6 +194,18 @@ const styles = StyleSheet.create({
   },
   age: {
     marginBottom: SPACE_4,
+  },
+  auraRow: {
+    flexDirection: 'row',
+    flexWrap:      'wrap',
+    justifyContent: 'center',
+    marginBottom:  SPACE_2,
+  },
+  auraChip: {
+    backgroundColor:   LCD_DARK,
+    paddingHorizontal: SPACE_4,
+    paddingVertical:   SPACE_2,
+    margin:            SPACE_2,
   },
   divider: {
     alignSelf: 'stretch',

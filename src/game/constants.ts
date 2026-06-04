@@ -74,3 +74,7 @@ export const FRIENDS_KEY = '@tama/friends/v1';
 // Independent of the pet save so it survives reset/restart — your collection is
 // permanent even after a pet dies. See game/codex.ts and game/evolution.ts.
 export const CODEX_KEY = '@tama/codex/v1';
+
+// The set of world events (eclipse, meteor, …) the player has ever witnessed.
+// Also permanent and save-independent. See game/eventCodex.ts and game/events.ts.
+export const EVENT_CODEX_KEY = '@tama/events/v1';

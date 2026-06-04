@@ -9,6 +9,7 @@ import {
   simulate,
   socialize,
   water,
+  witnessEvent,
 } from '../game/engine';
 import { initNotifications, rescheduleCareNotifications } from '../game/notifications';
 import { clearPet, loadPet, savePet } from '../game/storage';
@@ -159,6 +160,11 @@ export function usePet(): UsePet {
     applyState(socialize(petRef.current, Date.now()), true);
   }, [applyState]);
 
+  const actionWitnessEvent = useCallback((eventId: string) => {
+    if (petRef.current === null || petRef.current.isDead) return;
+    applyState(witnessEvent(petRef.current, eventId, Date.now()), true);
+  }, [applyState]);
+
   const actionSelectType = useCallback((petType: PetType, name?: string) => {
     applyState(createInitialPet(name ?? 'Pixel', petType, Date.now()), true);
   }, [applyState]);
@@ -182,10 +188,11 @@ export function usePet(): UsePet {
     play: actionPlay,
     water: actionWater,
     socialize: actionSocialize,
+    witnessEvent: actionWitnessEvent,
     selectType: actionSelectType,
     reset: actionReset,
     rename: actionRename,
-  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionSelectType, actionReset, actionRename]);
+  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionSelectType, actionReset, actionRename]);
 
   return {
     pet,

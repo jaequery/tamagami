@@ -9,6 +9,7 @@ import React from 'react';
 import { Modal, ScrollView, View, StyleSheet } from 'react-native';
 import type { PetType } from '../game/types';
 import { ALL_FORMS, TOTAL_FORMS, rarityEpithet, type FormId } from '../game/evolution';
+import { EVENT_CATALOG, TOTAL_EVENTS } from '../game/events';
 import { paletteForRarity, rarityAccent } from '../game/palettes';
 import { PetSprite } from './PetSprite';
 import { PixelText } from './PixelText';
@@ -29,15 +30,18 @@ import {
 
 const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
 const CELL_PX = 3; // sprite cell size inside a codex thumbnail (14 cells → 42pt)
+const NIGHT = paletteForRarity('secret'); // cosmic theme for witnessed events
 
 interface CodexModalProps {
   visible: boolean;
   discovered: Set<FormId>;
+  witnessedEvents: Set<string>;
   onClose: () => void;
 }
 
-export function CodexModal({ visible, discovered, onClose }: CodexModalProps): React.ReactElement {
+export function CodexModal({ visible, discovered, witnessedEvents, onClose }: CodexModalProps): React.ReactElement {
   const found = ALL_FORMS.filter((f) => discovered.has(f.id)).length;
+  const eventsFound = EVENT_CATALOG.filter((e) => witnessedEvents.has(e.id)).length;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -90,6 +94,38 @@ export function CodexModal({ visible, discovered, onClose }: CodexModalProps): R
                 </View>
               </View>
             ))}
+
+            {/* ── EVENTS — the world phenomena you've witnessed ── */}
+            <View style={styles.group}>
+              <PixelText variant="tiny" color={LCD_SHADE2} style={styles.groupLabel}>
+                EVENTS {eventsFound}/{TOTAL_EVENTS}
+              </PixelText>
+              <View style={styles.cellRow}>
+                {EVENT_CATALOG.map((ev) => {
+                  const isW = witnessedEvents.has(ev.id);
+                  return (
+                    <View key={ev.id} style={styles.cell}>
+                      <View
+                        style={[
+                          styles.thumb,
+                          {
+                            backgroundColor: isW ? NIGHT.bg : LCD_OFF,
+                            borderColor: isW ? NIGHT.shade2 : LCD_SHADE2,
+                          },
+                        ]}
+                      >
+                        <PixelText variant="lg" color={isW ? NIGHT.dark : LCD_SHADE2}>
+                          {isW ? ev.glyph : '?'}
+                        </PixelText>
+                      </View>
+                      <PixelText variant="tiny" color={isW ? LCD_DARK : LCD_SHADE2} style={styles.cellLabel}>
+                        {isW ? ev.short : '???'}
+                      </PixelText>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
           </ScrollView>
 
           <View style={styles.footer}>

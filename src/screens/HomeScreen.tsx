@@ -23,6 +23,9 @@ import {
 } from '../game/evolution';
 import { paletteForRarity, rarityAccent } from '../game/palettes';
 import { loadDiscovered, recordDiscovered } from '../game/codex';
+import { phaseOfDay, phaseLabel } from '../game/world';
+import { activeEventAt, eventById, type GameEvent } from '../game/events';
+import { loadWitnessed, recordWitnessed } from '../game/eventCodex';
 import { useNearby } from '../hooks/useNearby';
 import { DeviceFrame } from '../components/DeviceFrame';
 import { PetSprite } from '../components/PetSprite';
@@ -34,6 +37,8 @@ import { FriendsModal } from '../components/FriendsModal';
 import { RevealOverlay } from '../components/RevealOverlay';
 import { ShareCard } from '../components/ShareCard';
 import { CodexModal } from '../components/CodexModal';
+import { EventBanner } from '../components/EventBanner';
+import { EventReveal } from '../components/EventReveal';
 import {
   LCD_BG,
   LCD_DARK,
@@ -308,6 +313,39 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const handleCloseCodex = useCallback(() => setCodexOpen(false), []);
   const handleRevealDone = useCallback(() => setReveal(null), []);
 
+  // ── Living world: day/night + the event live right now (from the pet's clock) ──
+  const clockNow = pet.lastTick; // refreshed every sim tick → a ~1s-fresh wall clock
+  const phase = phaseOfDay(clockNow);
+  const activeEvent = pet.isDead ? null : activeEventAt(clockNow);
+  const petWitnessed = activeEvent !== null && pet.events.includes(activeEvent.id);
+  const aura = pet.events
+    .map((id) => eventById(id)?.glyph)
+    .filter((g): g is string => g !== undefined)
+    .join(' ');
+
+  // ── Event codex (lifetime witnessed) + the apparition reveal ──
+  const [witnessed, setWitnessed] = useState<Set<string>>(new Set());
+  const eventNonceRef = useRef(0);
+  const [eventReveal, setEventReveal] = useState<{ event: GameEvent; isNew: boolean; nonce: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadWitnessed().then((set) => { if (!cancelled) setWitnessed(set); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleWitnessEvent = useCallback(() => {
+    if (activeEvent === null) return;
+    const ev = activeEvent;
+    actions.witnessEvent(ev.id);
+    void recordWitnessed(ev.id).then((wasNew) => {
+      setWitnessed((current) => (current.has(ev.id) ? current : new Set(current).add(ev.id)));
+      setEventReveal({ event: ev, isNew: wasNew, nonce: eventNonceRef.current++ });
+    });
+  }, [activeEvent, actions]);
+
+  const handleEventRevealDone = useCallback(() => setEventReveal(null), []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -381,10 +419,26 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 caption !== null && (
                   <View style={styles.caption}>
                     <PixelText variant="tiny" color={LCD_SHADE2}>{caption}</PixelText>
+                    {aura.length > 0 && (
+                      <PixelText variant="tiny" color={LCD_DARK} style={styles.captionSub}>
+                        ✦ {aura}
+                      </PixelText>
+                    )}
                   </View>
                 )
               )}
             </View>
+
+            {/* ── Living world: the live event, or a whisper of the time of day ── */}
+            {activeEvent !== null ? (
+              <EventBanner event={activeEvent} witnessed={petWitnessed} onWitness={handleWitnessEvent} />
+            ) : (
+              !pet.isDead && (
+                <PixelText variant="tiny" color={LCD_SHADE2} style={styles.phaseLine}>
+                  · {phaseLabel(phase)} ·
+                </PixelText>
+              )
+            )}
 
             {/* ── Divider ── */}
             <View style={styles.divider} />
@@ -475,7 +529,12 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
       />
 
       <ShareCard visible={shareOpen} pet={pet} onClose={handleCloseShare} />
-      <CodexModal visible={codexOpen} discovered={discovered} onClose={handleCloseCodex} />
+      <CodexModal
+        visible={codexOpen}
+        discovered={discovered}
+        witnessedEvents={witnessed}
+        onClose={handleCloseCodex}
+      />
 
       {reveal !== null && (
         <RevealOverlay
@@ -485,6 +544,15 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
           stage={reveal.stage}
           isNewForm={reveal.isNew}
           onDone={handleRevealDone}
+        />
+      )}
+
+      {eventReveal !== null && (
+        <EventReveal
+          key={eventReveal.nonce}
+          event={eventReveal.event}
+          isNew={eventReveal.isNew}
+          onDone={handleEventRevealDone}
         />
       )}
     </SafeAreaView>
@@ -541,6 +609,11 @@ const styles = StyleSheet.create({
   },
   captionSub: {
     marginTop: SPACE_2,
+  },
+  phaseLine: {
+    textAlign: 'center',
+    marginTop:  SPACE_4,
+    opacity:    0.7,
   },
   metaBar: {
     flexDirection:  'row',

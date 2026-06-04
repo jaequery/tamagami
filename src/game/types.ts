@@ -43,6 +43,7 @@ export interface PetState {
   isDead: boolean;
   causeOfDeath: CauseOfDeath;
   ageSeconds: number;    // total seconds alive
+  events: string[];      // world-event ids this pet has witnessed (its aura). See game/events.ts
 }
 
 export interface PetActions {
@@ -50,6 +51,7 @@ export interface PetActions {
   play(): void;                                      // cat/dog
   water(): void;                                     // plant
   socialize(): void;                                 // any — boost from meeting a nearby pet
+  witnessEvent(eventId: string): void;               // any — record a live world event onto the pet
   selectType(petType: PetType, name?: string): void; // create / restart a pet
   reset(): void;                                     // clear pet → back to selection
   rename(name: string): void;

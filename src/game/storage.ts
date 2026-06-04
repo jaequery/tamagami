@@ -49,6 +49,19 @@ function validatePetState(parsed: unknown): PetState | null {
   const cleanedName = (p.name as string).replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim().slice(0, 20);
   const finalName = cleanedName.length > 0 ? cleanedName : 'Pixel';
 
+  // ── events: tolerant ──────────────────────────────────────────────────────
+  // The world-event aura was added after v3 shipped. Older v3 saves simply have
+  // no `events` key → treat as empty rather than invalidating the save (so we
+  // don't reset players twice). Reject only present-but-malformed data.
+  let events: string[] = [];
+  if (p.events !== undefined) {
+    if (!Array.isArray(p.events)) return null;
+    for (const e of p.events) {
+      if (typeof e !== 'string') return null;
+    }
+    events = (p.events as string[]).slice(0, 50);
+  }
+
   // All fields valid — construct the typed return value without an unsafe cast
   return {
     version: p.version as number,
@@ -60,6 +73,7 @@ function validatePetState(parsed: unknown): PetState | null {
     ageSeconds: p.ageSeconds as number,
     isDead: p.isDead as boolean,
     causeOfDeath: p.causeOfDeath as PetState['causeOfDeath'],
+    events,
     stats: {
       hunger: s.hunger as number,
       happiness: s.happiness as number,

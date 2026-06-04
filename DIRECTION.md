@@ -49,7 +49,9 @@ don't know how to unlock. That gap is the game.
 - **Phase 1 — SHIPPED IN THIS SLICE (the viral wedge):** egg → hatch → life stages,
   the rarity-palette system, the cartridge share-card, the codex with silhouettes,
   and the reveal animation. Delivers fun + new + mystery + a shareable object on its own.
-- **Phase 2 — Living world:** day/night + 2–3 rare events that branch secret forms.
+- **Phase 2 — SHIPPED (living world):** day/night phase + three deterministic timed
+  events (eclipse / 3am visitor / meteor shower) the pet can witness; witnessing stamps a
+  permanent aura and fills an EVENTS page in the codex. Details below.
 - **Phase 3 — Death legacy:** tombstone card, inherited egg, family tree. (Hook already
   exists: death has a cause.)
 - **Phase 4 — Social graph:** rare-meet odds, co-evolution, bond web.
@@ -72,6 +74,25 @@ Code map (all additive; the care engine, BLE social, widget, and tests are untou
 - `src/components/CodexModal.tsx` — the silhouette collection grid.
 - `HomeScreen` — derives stage + palette, runs the egg countdown, fires the reveal on
   stage-up, records discoveries, and exposes `[SHARE]` and `CODEX n/15`.
+
+## Phase 2 — what's built (living world)
+
+Code map (additive again; care engine, BLE, widget untouched; **no save-version bump** —
+the `events` field is tolerant, so the v3 saves already on TestFlight stay valid):
+
+- `src/game/world.ts` — `phaseOfDay` / `isNight` from the device clock (pure).
+- `src/game/events.ts` — three timed events with deterministic windows + `activeEventAt`;
+  the eclipse is calendar-seeded (`isEclipseDay`, ~1 day in 6) so it's the same for
+  everyone on the same day — that's what makes "the eclipse is live right now" shareable.
+- `src/game/eventCodex.ts` — lifetime witnessed-events set (permanent, save-independent).
+- `PetState.events: string[]` — this pet's witnessed-event aura (tolerant in storage).
+- `engine.witnessEvent` — idempotent reducer; `usePet` exposes `actions.witnessEvent`.
+- `EventBanner` (in-LCD omen + tap-to-witness), `EventReveal` (cosmic apparition reveal),
+  plus an EVENTS section in the codex and an aura row on the share card.
+
+**Event windows (local time):** meteor 21:00–05:00 nightly · 3am visitor 03:00–03:59 ·
+solar eclipse 12:00–12:59 on eclipse days (~1 in 6). To demo any of them without waiting,
+set the device clock — e.g. 3am for the visitor (genre-authentic clock-chasing).
 
 ### Tunables worth knowing
 
