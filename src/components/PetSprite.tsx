@@ -17,31 +17,39 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated, AccessibilityInfo, StyleSheet } from 'react-native';
-import type { Mood, PetType } from '../game/types';
+import type { LifeStage, Mood, PetType } from '../game/types';
+import { paletteForRarity, type LcdPalette } from '../game/palettes';
 import {
-  LCD_BG,
-  LCD_DARK,
-  LCD_SHADE2,
-  LCD_SHADE1,
   COLOR_WARNING,
   COLOR_TEAR,
   SHELL_LIGHT,
   CELL_SIZE,
 } from '../theme';
 
-// ─── Palette ──────────────────────────────────────────────────────────────
-const PALETTE: Record<number, string> = {
-  0: 'transparent',
-  1: LCD_DARK,
-  2: LCD_SHADE2,
-  3: LCD_SHADE1,
-  4: '#FFFFFF',
-  5: COLOR_WARNING,
-  6: SHELL_LIGHT,
-  7: COLOR_TEAR,
-};
-
 type SpriteMatrix = number[][];
+
+// Default tint: classic DMG green — so a common pet renders byte-for-byte as the
+// app always has. Rarity palettes (game/palettes.ts) override indices 1/2/3.
+const COMMON_PALETTE = paletteForRarity('common');
+
+/**
+ * Resolve a sprite cell index to a concrete color for the given palette.
+ *   0 → background (transparent cell; caller decides what shows through)
+ *   1/2/3 → the rarity ramp (dark → light)
+ *   4 white highlight, 5 warning, 6 shell accent, 7 tear — semantic, palette-independent
+ */
+function cellColor(cell: number, palette: LcdPalette, background: string): string {
+  switch (cell) {
+    case 1: return palette.dark;
+    case 2: return palette.shade2;
+    case 3: return palette.shade1;
+    case 4: return '#FFFFFF';
+    case 5: return COLOR_WARNING;
+    case 6: return SHELL_LIGHT;
+    case 7: return COLOR_TEAR;
+    default: return background; // 0 / unknown
+  }
+}
 
 // ─── PLANT — a potted sprout with a face on the pot ──────────────────────────
 const SPRITE_PLANT_NEUTRAL: SpriteMatrix = [
@@ -217,6 +225,24 @@ const SPRITE_DEAD: SpriteMatrix = [
   [0,0,0,3,3,3,0,3,3,3,0,0,0,0],
 ];
 
+// ─── EGG — pre-hatch mystery (shared across types; rarity hides inside) ───────
+const SPRITE_EGG: SpriteMatrix = [
+  [0,0,0,0,0,1,1,1,1,0,0,0,0,0],
+  [0,0,0,1,1,3,3,3,3,1,1,0,0,0],
+  [0,0,1,3,3,3,3,3,3,3,3,1,0,0],
+  [0,1,3,3,3,3,3,3,3,3,3,3,1,0],
+  [0,1,3,3,3,2,3,3,3,3,3,3,1,0],
+  [1,3,3,3,3,3,3,3,3,2,3,3,3,1],
+  [1,3,3,2,3,3,3,3,3,3,3,3,3,1],
+  [1,3,3,3,3,3,3,2,3,3,3,3,3,1],
+  [1,3,3,3,3,3,3,3,3,3,3,2,3,1],
+  [1,3,3,3,2,3,3,3,3,3,3,3,3,1],
+  [0,1,3,3,3,3,3,3,2,3,3,3,1,0],
+  [0,1,3,3,3,3,3,3,3,3,3,3,1,0],
+  [0,0,1,1,3,3,3,3,3,3,1,1,0,0],
+  [0,0,0,0,1,1,1,1,1,1,0,0,0,0],
+];
+
 // ─── Sprite Lookup ──────────────────────────────────────────────────────────
 
 const SPRITES: Record<PetType, Record<'happy' | 'neutral' | 'sad', SpriteMatrix>> = {
@@ -238,15 +264,28 @@ function getSprite(petType: PetType, mood: Mood): SpriteMatrix {
 interface PetSpriteProps {
   petType: PetType;
   mood: Mood;
-  cellSize?: number; // pt per pixel cell; defaults to the theme CELL_SIZE
+  stage?: LifeStage;      // 'egg' renders the egg sprite (rarity stays hidden inside)
+  palette?: LcdPalette;   // rarity tint; defaults to common (DMG green)
+  background?: string;    // color shown through transparent cells; defaults to palette.bg
+  cellSize?: number;      // pt per pixel cell; defaults to the theme CELL_SIZE
 }
 
-export function PetSprite({ petType, mood, cellSize = CELL_SIZE }: PetSpriteProps): React.ReactElement {
-  const sprite = getSprite(petType, mood);
+export function PetSprite({
+  petType,
+  mood,
+  stage,
+  palette = COMMON_PALETTE,
+  background,
+  cellSize = CELL_SIZE,
+}: PetSpriteProps): React.ReactElement {
+  const isEgg = stage === 'egg';
+  const sprite = isEgg ? SPRITE_EGG : getSprite(petType, mood);
+  const bg = background ?? palette.bg;
   const [translateY] = useState(() => new Animated.Value(0));
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  const isDead = mood === 'dead';
+  // An egg gently wobbles (it's incubating, not dead); a ghost stays frozen.
+  const isDead = mood === 'dead' && !isEgg;
 
   useEffect(() => {
     let reducedMotion = false;
@@ -275,8 +314,9 @@ export function PetSprite({ petType, mood, cellSize = CELL_SIZE }: PetSpriteProp
     };
   }, [isDead, translateY]);
 
-  const accessLabel =
-    mood === 'dead'
+  const accessLabel = isEgg
+    ? 'Pet sprite: unhatched egg'
+    : mood === 'dead'
       ? 'Pet sprite: ghost'
       : `Pet sprite: ${mood} ${petType}`;
 
@@ -288,18 +328,15 @@ export function PetSprite({ petType, mood, cellSize = CELL_SIZE }: PetSpriteProp
     >
       {sprite.map((row, rowIdx) => (
         <View key={rowIdx} style={styles.row}>
-          {row.map((cell, colIdx) => {
-            const color = PALETTE[cell] ?? 'transparent';
-            return (
-              <View
-                key={colIdx}
-                style={[
-                  { width: cellSize, height: cellSize },
-                  { backgroundColor: color === 'transparent' ? LCD_BG : color },
-                ]}
-              />
-            );
-          })}
+          {row.map((cell, colIdx) => (
+            <View
+              key={colIdx}
+              style={[
+                { width: cellSize, height: cellSize },
+                { backgroundColor: cellColor(cell, palette, bg) },
+              ]}
+            />
+          ))}
         </View>
       ))}
     </Animated.View>

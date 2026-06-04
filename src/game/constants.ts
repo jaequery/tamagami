@@ -1,9 +1,9 @@
 // ─── Storage ─────────────────────────────────────────────────────────────────
-// v2 introduces pet types + a slimmed stat model. v1 saves are intentionally not
-// migrated (pre-launch, no production data) — they fail validation and the user
-// is dropped back on the pet-selection screen to pick fresh.
-export const STORAGE_KEY = '@tama/pet/v2';
-export const CURRENT_VERSION = 2;
+// v3 adds the immutable `rarity` trait (egg/evolution system). Older saves lack
+// it, fail validation, and drop the user back to pet-selection to hatch fresh —
+// same intentional no-migration policy as v1→v2 (pre-launch, no production data).
+export const STORAGE_KEY = '@tama/pet/v3';
+export const CURRENT_VERSION = 3;
 
 // ─── Catch-up cap ────────────────────────────────────────────────────────────
 // Maximum elapsed seconds applied in a single simulate() call.
@@ -68,3 +68,9 @@ export const SOCIAL_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes per peer
 // reset never wipes your friends or your stable device identity).
 export const DEVICE_ID_KEY = '@tama/deviceId/v1';
 export const FRIENDS_KEY = '@tama/friends/v1';
+
+// ─── Codex (collection) ───────────────────────────────────────────────────────
+// The set of forms (petType × rarity) the player has hatched at least once.
+// Independent of the pet save so it survives reset/restart — your collection is
+// permanent even after a pet dies. See game/codex.ts and game/evolution.ts.
+export const CODEX_KEY = '@tama/codex/v1';

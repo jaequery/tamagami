@@ -1,5 +1,6 @@
 import type { CauseOfDeath, Mood, PetState, PetType } from './types';
 import { isAnimal } from './profiles';
+import { rollRarity } from './evolution';
 import {
   CURRENT_VERSION,
   FEED_HAPPINESS_DELTA,
@@ -40,10 +41,12 @@ function sanitizeName(raw: string): string {
 // ─── Initial state ────────────────────────────────────────────────────────────
 
 export function createInitialPet(name: string, petType: PetType, now: number): PetState {
+  const cleanName = sanitizeName(name);
   return {
     version: CURRENT_VERSION,
     petType,
-    name: sanitizeName(name),
+    rarity: rollRarity(now, cleanName, petType),
+    name: cleanName,
     bornAt: now,
     lastTick: now,
     stats: {

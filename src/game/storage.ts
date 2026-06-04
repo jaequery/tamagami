@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CURRENT_VERSION, STORAGE_KEY } from './constants';
-import type { PetState, PetType } from './types';
+import { RARITIES } from './evolution';
+import type { PetState, PetType, Rarity } from './types';
 
 // ─── Runtime validation ───────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ function validatePetState(parsed: unknown): PetState | null {
   // ── Top-level scalar fields ───────────────────────────────────────────────
   if (typeof p.version !== 'number' || p.version !== CURRENT_VERSION) return null;
   if (!PET_TYPES.includes(p.petType as PetType)) return null;
+  if (!RARITIES.includes(p.rarity as Rarity)) return null;
   if (typeof p.name !== 'string') return null;
   if (!isFiniteInRange(p.bornAt, 0, Number.MAX_SAFE_INTEGER)) return null;
   if (!isFiniteInRange(p.lastTick, 0, Number.MAX_SAFE_INTEGER)) return null;
@@ -51,6 +53,7 @@ function validatePetState(parsed: unknown): PetState | null {
   return {
     version: p.version as number,
     petType: p.petType as PetType,
+    rarity: p.rarity as Rarity,
     name: finalName,
     bornAt: p.bornAt as number,
     lastTick: p.lastTick as number,

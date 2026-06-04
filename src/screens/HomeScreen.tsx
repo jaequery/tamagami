@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -8,9 +8,21 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
-import type { CauseOfDeath, Mood, PetActions, PetState } from '../game/types';
+import type { CauseOfDeath, LifeStage, Mood, PetActions, PetState } from '../game/types';
 import { profileFor } from '../game/profiles';
 import type { ActionKey } from '../game/profiles';
+import {
+  stageFor,
+  isHatched,
+  secondsUntilHatch,
+  formIdFor,
+  rarityEpithet,
+  STAGE_ORDER,
+  TOTAL_FORMS,
+  type FormId,
+} from '../game/evolution';
+import { paletteForRarity, rarityAccent } from '../game/palettes';
+import { loadDiscovered, recordDiscovered } from '../game/codex';
 import { useNearby } from '../hooks/useNearby';
 import { DeviceFrame } from '../components/DeviceFrame';
 import { PetSprite } from '../components/PetSprite';
@@ -19,6 +31,9 @@ import { PixelButton } from '../components/PixelButton';
 import { PixelText } from '../components/PixelText';
 import { NearbyMeet } from '../components/NearbyMeet';
 import { FriendsModal } from '../components/FriendsModal';
+import { RevealOverlay } from '../components/RevealOverlay';
+import { ShareCard } from '../components/ShareCard';
+import { CodexModal } from '../components/CodexModal';
 import {
   LCD_BG,
   LCD_DARK,
@@ -34,6 +49,7 @@ import {
   SPACE_12,
   PIXEL,
   BORDER_WIDTH,
+  BORDER_HEAVY,
   STAT_CRITICAL_THRESHOLD,
 } from '../theme';
 
@@ -243,6 +259,55 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
     (s) => pet.stats[s.key] <= STAT_CRITICAL_THRESHOLD,
   );
 
+  // ── Evolution: life stage + rarity palette (derived from the pet) ──
+  const stage = stageFor(pet.ageSeconds);
+  const hatched = isHatched(stage);
+  const palette = paletteForRarity(pet.rarity);
+  // The egg must NOT betray its rarity — render it in the neutral DMG palette so
+  // the color can't leak the surprise. Only a hatched pet wears its true colors.
+  const eggPalette = paletteForRarity('common');
+  const showRarityFrame = hatched && pet.rarity !== 'common';
+  const caption = hatched ? `${rarityEpithet(pet.rarity)} ${stage.toUpperCase()}` : null;
+  const hatchIn = stage === 'egg' ? secondsUntilHatch(pet.ageSeconds) : 0;
+
+  // ── Codex (collection) + share/codex modals ──
+  const [discovered, setDiscovered] = useState<Set<FormId>>(new Set());
+  const [codexOpen, setCodexOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadDiscovered().then((set) => { if (!cancelled) setDiscovered(set); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Reveal: celebrate when the pet crosses into a higher life stage ──
+  const prevStageRef = useRef<LifeStage | null>(null);
+  const nonceRef = useRef(0);
+  const [reveal, setReveal] = useState<{ stage: LifeStage; isNew: boolean; nonce: number } | null>(null);
+
+  useEffect(() => {
+    const prev = prevStageRef.current;
+    prevStageRef.current = stage;
+    if (!isHatched(stage)) return; // egg: nothing discovered yet
+
+    const advanced = prev !== null && STAGE_ORDER.indexOf(stage) > STAGE_ORDER.indexOf(prev);
+    const formId = formIdFor(pet.petType, pet.rarity);
+
+    // Keep the codex correct for the current form (covers loading a grown pet)...
+    void recordDiscovered(formId).then((wasNew) => {
+      setDiscovered((current) => (current.has(formId) ? current : new Set(current).add(formId)));
+      // ...but only fire the big reveal when the stage actually advanced live.
+      if (advanced) setReveal({ stage, isNew: wasNew, nonce: nonceRef.current++ });
+    });
+  }, [stage, pet.petType, pet.rarity]);
+
+  const handleOpenShare = useCallback(() => setShareOpen(true), []);
+  const handleCloseShare = useCallback(() => setShareOpen(false), []);
+  const handleOpenCodex = useCallback(() => setCodexOpen(true), []);
+  const handleCloseCodex = useCallback(() => setCodexOpen(false), []);
+  const handleRevealDone = useCallback(() => setReveal(null), []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -283,11 +348,42 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
               </View>
             </View>
 
-            {/* ── Pet sprite ── */}
+            {/* ── Pet sprite + stage caption ── */}
             <View style={styles.spriteRow}>
-              <View style={styles.spriteContainer}>
-                <PetSprite petType={pet.petType} mood={mood} />
+              <View
+                style={[
+                  styles.spriteContainer,
+                  showRarityFrame && {
+                    backgroundColor: palette.bg,
+                    borderColor: rarityAccent(pet.rarity),
+                    borderWidth: BORDER_HEAVY,
+                    padding: SPACE_4,
+                  },
+                ]}
+              >
+                <PetSprite
+                  petType={pet.petType}
+                  mood={mood}
+                  stage={stage}
+                  palette={stage === 'egg' ? eggPalette : palette}
+                  background={showRarityFrame ? palette.bg : LCD_BG}
+                />
               </View>
+
+              {stage === 'egg' ? (
+                <View style={styles.caption}>
+                  <PixelText variant="tiny" color={LCD_SHADE2}>INCUBATING</PixelText>
+                  <PixelText variant="tiny" color={LCD_DARK} style={styles.captionSub}>
+                    HATCHES IN {hatchIn}s
+                  </PixelText>
+                </View>
+              ) : (
+                caption !== null && (
+                  <View style={styles.caption}>
+                    <PixelText variant="tiny" color={LCD_SHADE2}>{caption}</PixelText>
+                  </View>
+                )
+              )}
             </View>
 
             {/* ── Divider ── */}
@@ -317,6 +413,26 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                   );
                 })}
               </View>
+            </View>
+
+            {/* ── Share / Codex controls ── */}
+            <View style={styles.metaBar}>
+              <TouchableOpacity
+                onPress={handleOpenShare}
+                hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
+                accessibilityRole="button"
+                accessibilityLabel="Share your pet as a cartridge card"
+              >
+                <PixelText variant="tiny" color={LCD_DARK}>[SHARE]</PixelText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleOpenCodex}
+                hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Open codex, ${discovered.size} of ${TOTAL_FORMS} forms found`}
+              >
+                <PixelText variant="tiny" color={LCD_DARK}>CODEX {discovered.size}/{TOTAL_FORMS}</PixelText>
+              </TouchableOpacity>
             </View>
 
             {/* ── Social Bar (nearby pets) ── */}
@@ -357,6 +473,20 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
         friends={friends}
         onClose={handleCloseFriends}
       />
+
+      <ShareCard visible={shareOpen} pet={pet} onClose={handleCloseShare} />
+      <CodexModal visible={codexOpen} discovered={discovered} onClose={handleCloseCodex} />
+
+      {reveal !== null && (
+        <RevealOverlay
+          key={reveal.nonce}
+          petType={pet.petType}
+          rarity={pet.rarity}
+          stage={reveal.stage}
+          isNewForm={reveal.isNew}
+          onDone={handleRevealDone}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -404,6 +534,20 @@ const styles = StyleSheet.create({
   },
   spriteContainer: {
     alignItems: 'center',
+  },
+  caption: {
+    alignItems:    'center',
+    marginTop:     SPACE_4,
+  },
+  captionSub: {
+    marginTop: SPACE_2,
+  },
+  metaBar: {
+    flexDirection:  'row',
+    justifyContent: 'space-between',
+    alignItems:     'center',
+    marginTop:      SPACE_4,
+    paddingTop:     SPACE_2,
   },
   divider: {
     height:          BORDER_WIDTH,

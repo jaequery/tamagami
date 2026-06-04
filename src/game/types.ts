@@ -6,6 +6,18 @@ export type PetType = 'plant' | 'cat' | 'dog';
 export type CauseOfDeath = 'starvation' | 'thirst' | 'neglect' | null;
 export type Mood = 'happy' | 'neutral' | 'sad' | 'dead';
 
+// ─── Rarity ───────────────────────────────────────────────────────────────────
+// Rolled once at birth and stored. Drives the pet's LCD palette and its codex
+// entry. The curiosity gap: you don't learn which one you got until the egg
+// hatches. See game/evolution.ts (roll + weights) and game/palettes.ts (colors).
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'secret';
+
+// ─── Life stage ───────────────────────────────────────────────────────────────
+// Derived from ageSeconds (NOT stored) so it can never drift from the clock.
+// 'egg' is the pre-hatch stage; everything after is a grown form. Each crossing
+// is a "reveal" the UI celebrates. See game/evolution.ts (thresholds).
+export type LifeStage = 'egg' | 'baby' | 'child' | 'teen' | 'adult' | 'elder';
+
 /**
  * All numeric care stats. Each pet type only *uses* a subset (see PET_PROFILES):
  *  - plant  → water
@@ -23,6 +35,7 @@ export interface PetStats {
 export interface PetState {
   version: number;
   petType: PetType;
+  rarity: Rarity;        // rolled at birth, immutable — drives palette + codex form
   name: string;
   bornAt: number;        // epoch ms
   lastTick: number;      // epoch ms of last simulate()
