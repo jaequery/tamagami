@@ -4,6 +4,9 @@
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import type { Friend, PetType } from '../game/types';
+import { bondLevel, bondLabel } from '../game/social';
+import { rarityEpithet } from '../game/evolution';
+import { rarityAccent } from '../game/palettes';
 import { PixelText } from './PixelText';
 import { PixelButton } from './PixelButton';
 import {
@@ -60,12 +63,17 @@ export function FriendsModal({ visible, now, friends, onClose }: FriendsModalPro
             <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
               {friends.map((f) => (
                 <View key={f.id} style={styles.row}>
-                  <View style={styles.tag}>
+                  <View style={[styles.tag, { backgroundColor: rarityAccent(f.rarity) }]}>
                     <PixelText variant="sm" color={LCD_BG}>{TYPE_TAG[f.petType]}</PixelText>
                   </View>
-                  <PixelText variant="sm" color={LCD_DARK} numberOfLines={1} style={styles.name}>
-                    {f.name.toUpperCase()}
-                  </PixelText>
+                  <View style={styles.rowMain}>
+                    <PixelText variant="sm" color={LCD_DARK} numberOfLines={1}>
+                      {f.name.toUpperCase()}
+                    </PixelText>
+                    <PixelText variant="tiny" color={LCD_SHADE2} numberOfLines={1}>
+                      {rarityEpithet(f.rarity)} · {bondLabel(bondLevel(f.meetCount))}
+                    </PixelText>
+                  </View>
                   <PixelText variant="tiny" color={LCD_SHADE2} style={styles.meta}>
                     ×{f.meetCount} · {formatAgo(f.lastMetAt, now)}
                   </PixelText>
@@ -125,7 +133,7 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     marginRight:     SPACE_4,
   },
-  name: {
+  rowMain: {
     flex: 1,
   },
   meta: {

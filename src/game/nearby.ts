@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import type { EventSubscription } from 'expo-modules-core';
 import { DEVICE_ID_KEY } from './constants';
-import type { PeerIdentity, PetType } from './types';
+import type { PeerIdentity, PetType, Rarity } from './types';
 import type {
   BluetoothState,
   PeerFoundEvent,
@@ -41,21 +41,41 @@ const NAME_MAX = 10;
 const TYPE_TO_CODE: Record<PetType, string> = { plant: 'p', cat: 'c', dog: 'd' };
 const CODE_TO_TYPE: Record<string, PetType> = { p: 'plant', c: 'cat', d: 'dog' };
 
+const RARITY_TO_CODE: Record<Rarity, string> = {
+  common: 'o', uncommon: 'u', rare: 'r', epic: 'e', secret: 's',
+};
+const CODE_TO_RARITY: Record<string, Rarity> = {
+  o: 'common', u: 'uncommon', r: 'rare', e: 'epic', s: 'secret',
+};
+
 export function encodePayload(identity: PeerIdentity): string {
   const code = TYPE_TO_CODE[identity.petType];
+  const rcode = RARITY_TO_CODE[identity.rarity];
   const name = identity.name.slice(0, NAME_MAX);
-  return [PREFIX, identity.id, code, name].join(SEP);
+  return [PREFIX, identity.id, code, rcode, name].join(SEP);
 }
 
 export function decodePayload(raw: string): PeerIdentity | null {
   const parts = raw.split(SEP);
-  if (parts.length !== 4) return null;
-  const [prefix, id, code, name] = parts;
+  // 5 fields = current (with rarity); 4 = legacy pre-rarity payloads → common.
+  if (parts.length !== 4 && parts.length !== 5) return null;
+  const prefix = parts[0];
+  const id = parts[1];
+  const code = parts[2];
   if (prefix !== PREFIX) return null;
   if (id.length === 0) return null;
   const petType = CODE_TO_TYPE[code];
   if (petType === undefined) return null;
-  return { id, name: name.length > 0 ? name : 'Pixel', petType };
+
+  let rarity: Rarity = 'common';
+  let name: string;
+  if (parts.length === 5) {
+    rarity = CODE_TO_RARITY[parts[3]] ?? 'common';
+    name = parts[4];
+  } else {
+    name = parts[3];
+  }
+  return { id, name: name.length > 0 ? name : 'Pixel', petType, rarity };
 }
 
 // ─── Stable device identity ───────────────────────────────────────────────────

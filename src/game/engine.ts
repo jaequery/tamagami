@@ -1,6 +1,6 @@
 import type { CauseOfDeath, Mood, PetState, PetType } from './types';
 import { isAnimal } from './profiles';
-import { rollRarity, rollHeirRarity } from './evolution';
+import { rollRarityWithLuck, rollHeirRarity } from './evolution';
 import {
   CURRENT_VERSION,
   FEED_HAPPINESS_DELTA,
@@ -40,12 +40,12 @@ function sanitizeName(raw: string): string {
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
-export function createInitialPet(name: string, petType: PetType, now: number): PetState {
+export function createInitialPet(name: string, petType: PetType, now: number, luck = 0): PetState {
   const cleanName = sanitizeName(name);
   return {
     version: CURRENT_VERSION,
     petType,
-    rarity: rollRarity(now, cleanName, petType),
+    rarity: rollRarityWithLuck(now, cleanName, petType, luck),
     name: cleanName,
     bornAt: now,
     lastTick: now,
@@ -69,11 +69,11 @@ export function createInitialPet(name: string, petType: PetType, now: number): P
  * luck (see rollHeirRarity). The heir starts fresh as its own egg — death isn't
  * game-over, it's the next chapter of the line.
  */
-export function createHeir(parent: PetState, now: number): PetState {
-  const base = createInitialPet(parent.name, parent.petType, now);
+export function createHeir(parent: PetState, now: number, luck = 0): PetState {
+  const base = createInitialPet(parent.name, parent.petType, now, luck);
   return {
     ...base,
-    rarity: rollHeirRarity(now, base.name, parent.petType, parent.rarity),
+    rarity: rollHeirRarity(now, base.name, parent.petType, parent.rarity, luck),
     generation: (parent.generation ?? 1) + 1,
   };
 }

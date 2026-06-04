@@ -64,6 +64,16 @@ export const SOCIAL_WATER_BOOST = 15;     // plant
 // phones sitting on a desk together from pinning every stat to 100.
 export const SOCIAL_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes per peer
 
+// ─── Bonds + charm (Phase 4 social graph) ─────────────────────────────────────
+// Bond strength is your distinct meet count with a friend. Crossing a threshold
+// promotes the bond (shown in the friends list).
+export const BOND_FRIEND_MEETS = 3;   // ≥3 meets → FRIEND
+export const BOND_BESTIE_MEETS = 6;   // ≥6 meets → BESTIE
+// Each rare-or-better friend you've made adds 1 "charm", which gives your NEXT
+// hatched pet an extra rarity roll (best wins) — so a social collector breeds
+// luckier eggs. Capped so it stays a nudge, not a guarantee.
+export const CHARM_CAP = 3;
+
 // AsyncStorage keys for the social layer (independent of the pet save, so a pet
 // reset never wipes your friends or your stable device identity).
 export const DEVICE_ID_KEY = '@tama/deviceId/v1';

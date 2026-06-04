@@ -10,11 +10,22 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FRIENDS_KEY, SOCIAL_COOLDOWN_MS } from './constants';
-import type { Friend, PeerIdentity, PetType } from './types';
+import { RARITIES } from './evolution';
+import type { Friend, PeerIdentity, PetType, Rarity } from './types';
 
 const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
 
-function isFriend(value: unknown): value is Friend {
+/** Coerce a possibly-missing/invalid stored rarity to a valid one (legacy → common). */
+function coerceRarity(value: unknown): Rarity {
+  return (RARITIES as readonly string[]).includes(value as string) ? (value as Rarity) : 'common';
+}
+
+/**
+ * Shape-check the non-rarity fields. Rarity is added after launch, so older
+ * stored friends won't have it — it's normalized separately (coerceRarity) rather
+ * than rejected here, so a pre-rarity friends log survives the upgrade.
+ */
+function isFriendish(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const f = value as Record<string, unknown>;
   return (
@@ -26,6 +37,19 @@ function isFriend(value: unknown): value is Friend {
     typeof f.lastMetAt === 'number' &&
     typeof f.meetCount === 'number'
   );
+}
+
+function toFriend(value: unknown): Friend {
+  const f = value as Record<string, unknown>;
+  return {
+    id: f.id as string,
+    name: f.name as string,
+    petType: f.petType as PetType,
+    rarity: coerceRarity(f.rarity),
+    firstMetAt: f.firstMetAt as number,
+    lastMetAt: f.lastMetAt as number,
+    meetCount: f.meetCount as number,
+  };
 }
 
 // In-memory cache so the hot path (a sighting every few seconds) doesn't hit
@@ -41,7 +65,10 @@ async function ensureLoaded(): Promise<Map<string, Friend>> {
       const parsed: unknown = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         for (const item of parsed) {
-          if (isFriend(item)) map.set(item.id, item);
+          if (isFriendish(item)) {
+            const friend = toFriend(item);
+            map.set(friend.id, friend);
+          }
         }
       }
     }
@@ -87,6 +114,7 @@ export async function recordEncounter(peer: PeerIdentity, now: number): Promise<
       id: peer.id,
       name: peer.name,
       petType: peer.petType,
+      rarity: peer.rarity,
       firstMetAt: now,
       lastMetAt: now,
       meetCount: 1,
@@ -105,6 +133,7 @@ export async function recordEncounter(peer: PeerIdentity, now: number): Promise<
     ...existing,
     name: peer.name,         // refresh in case they renamed
     petType: peer.petType,
+    rarity: peer.rarity,     // refresh — their pet may have hatched/evolved since
     lastMetAt: now,
     meetCount: existing.meetCount + 1,
   };

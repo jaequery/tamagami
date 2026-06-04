@@ -67,6 +67,7 @@ export interface PeerIdentity {
   id: string;        // stable device id (8 hex chars)
   name: string;      // pet name (truncated for the air)
   petType: PetType;
+  rarity: Rarity;    // broadcast so meeting a rare pet is visible + lucky. See game/nearby.ts
 }
 
 /** A pet you've met nearby, remembered locally. Keyed by PeerIdentity.id. */
@@ -74,9 +75,10 @@ export interface Friend {
   id: string;
   name: string;
   petType: PetType;
+  rarity: Rarity;     // rarity last seen for this peer (drives bond luck + display)
   firstMetAt: number; // epoch ms
   lastMetAt: number;  // epoch ms
-  meetCount: number;  // distinct encounters (cooldown-gated)
+  meetCount: number;  // distinct encounters (cooldown-gated) — bond strength
 }
 
 export interface UsePet {

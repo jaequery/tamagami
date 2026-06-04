@@ -7,11 +7,15 @@ import { Animated, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import type { Friend, PetType } from '../game/types';
 import { isAnimal } from '../game/profiles';
+import { rarityEpithet, rarityRank } from '../game/evolution';
+import { paletteForRarity, rarityAccent } from '../game/palettes';
 import { PetSprite } from './PetSprite';
 import { PixelText } from './PixelText';
 import {
   COLOR_OVERLAY,
   LCD_BG,
+  BORDER_WIDTH,
+  SPACE_2,
   SPACE_4,
   SPACE_6,
   SPACE_8,
@@ -48,24 +52,36 @@ export function NearbyMeet({ localType, peer, onDone }: NearbyMeetProps): React.
   }, [anim, onDone]);
 
   const boostLabel = isAnimal(localType) ? '+ HAPPY' : '+ WATER';
+  const peerRare = rarityRank(peer.rarity) >= rarityRank('rare');
 
   return (
     <Animated.View
       pointerEvents="none"
       style={[styles.overlay, { opacity: anim }]}
       accessible
-      accessibilityLabel={`Met ${peer.name} nearby`}
+      accessibilityLabel={`Met ${peer.name}${peerRare ? `, a ${rarityEpithet(peer.rarity)} pet,` : ''} nearby`}
     >
       <View style={styles.spriteRow}>
         <PetSprite petType={localType} mood="happy" cellSize={MEET_CELL} />
         <PixelText variant="lg" color={LCD_BG} style={styles.heart}>+</PixelText>
-        <PetSprite petType={peer.petType} mood="happy" cellSize={MEET_CELL} />
+        <PetSprite
+          petType={peer.petType}
+          mood="happy"
+          cellSize={MEET_CELL}
+          palette={paletteForRarity(peer.rarity)}
+        />
       </View>
 
       <PixelText variant="md" color={LCD_BG} style={styles.title} numberOfLines={1}>
         MET {peer.name.toUpperCase()}!
       </PixelText>
       <PixelText variant="sm" color={LCD_BG}>{boostLabel}</PixelText>
+
+      {peerRare && (
+        <View style={[styles.rarityTag, { backgroundColor: rarityAccent(peer.rarity) }]}>
+          <PixelText variant="tiny" color={LCD_BG}>{rarityEpithet(peer.rarity)} PET! +LUCK</PixelText>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -89,5 +105,12 @@ const styles = StyleSheet.create({
   },
   title: {
     marginBottom: SPACE_4,
+  },
+  rarityTag: {
+    marginTop:         SPACE_6,
+    paddingHorizontal: SPACE_4,
+    paddingVertical:   SPACE_2,
+    borderWidth:       BORDER_WIDTH,
+    borderColor:       'rgba(0,0,0,0.25)',
   },
 });

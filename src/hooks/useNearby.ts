@@ -94,6 +94,7 @@ export function useNearby(pet: PetState, socialize: () => void): UseNearby {
   // ── BLE session lifecycle ───────────────────────────────────────────────────
   const petName = pet.name;
   const petType = pet.petType;
+  const petRarity = pet.rarity;
   const isDead = pet.isDead;
 
   useEffect(() => {
@@ -120,7 +121,7 @@ export function useNearby(pet: PetState, socialize: () => void): UseNearby {
       if (cancelled) return;
       deviceIdRef.current = id;
 
-      const self: PeerIdentity = { id, name: petName, petType };
+      const self: PeerIdentity = { id, name: petName, petType, rarity: petRarity };
       sessionRef.current = startNearby(self, {
         onPeer: handlePeer,
         onState: setBluetoothState,
@@ -140,7 +141,7 @@ export function useNearby(pet: PetState, socialize: () => void): UseNearby {
       sub.remove();
       stopSession();
     };
-  }, [supported, petName, petType, isDead, handlePeer]);
+  }, [supported, petName, petType, petRarity, isDead, handlePeer]);
 
   return { supported, bluetoothState, nearby, friends, meet, clearMeet };
 }

@@ -55,7 +55,9 @@ don't know how to unlock. That gap is the game.
 - **Phase 3 — SHIPPED (death legacy):** death now offers CONTINUE LINE (hatch an heir
   that inherits the bloodline's luck), a tombstone share card, and a family tree of every
   generation. Details below.
-- **Phase 4 — Social graph:** rare-meet odds, co-evolution, bond web.
+- **Phase 4 — SHIPPED (social graph):** rarity now travels over BLE; friends carry it,
+  bonds level up with repeat meets, and each rare-or-better friend makes your next egg
+  luckier. The four-engine vision is complete. Details below.
 
 ## Phase 1 — what's actually built
 
@@ -111,6 +113,23 @@ Code map (additive; **no save-version bump** — `generation` is tolerant like `
 - Death overlay now offers **CONTINUE LINE / SHARE / NEW PET** with the epitaph; the
   share card has a tombstone variant (R.I.P., cause, epitaph, GEN); `GEN n` in the meta
   bar opens the **family tree** (`LineageModal`).
+
+## Phase 4 — what's built (social graph)
+
+Code map (additive; **no save-version bump** — rarity over BLE and on friends is tolerant):
+
+- `nearby.ts` — the BLE payload now carries a 1-char rarity code; `decodePayload` accepts
+  both the new 5-field form and legacy 4-field (pre-rarity → common), so a mixed-version
+  room still meets. `PeerIdentity` gains `rarity`.
+- `friends.ts` — `Friend` gains `rarity` (tolerant load: old friends → common), refreshed
+  on each meet.
+- `social.ts` — `bondLevel` (MET → FRIEND → BESTIE by meet count) and `charmFromFriends`
+  (distinct rare+ friends, capped at `CHARM_CAP`).
+- `evolution.rollRarityWithLuck` — `luck` extra rolls, best wins; `createInitialPet` /
+  `createHeir` take `luck`, and `usePet` feeds in the charm at every hatch — so meeting
+  rare pets measurably raises your next egg's odds (tested: lifts the average rarity).
+- UI: friends list shows rarity + bond; the nearby-meet pop tints the peer by its rarity
+  and flags `RARE PET! +LUCK` on a rare-or-better encounter.
 
 ### Tunables worth knowing
 
