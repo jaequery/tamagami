@@ -9,8 +9,15 @@ import {
   StyleSheet,
 } from 'react-native';
 import type { CauseOfDeath, LifeStage, Mood, PetActions, PetState } from '../game/types';
-import { profileFor } from '../game/profiles';
+import { isAnimal, profileFor } from '../game/profiles';
 import type { ActionKey } from '../game/profiles';
+import {
+  coinsLabel,
+  currentJob,
+  isWorking,
+  shiftEarned,
+  shiftElapsedSec,
+} from '../game/economy';
 import {
   stageFor,
   isHatched,
@@ -41,6 +48,8 @@ import { CodexModal } from '../components/CodexModal';
 import { EventBanner } from '../components/EventBanner';
 import { EventReveal } from '../components/EventReveal';
 import { LineageModal } from '../components/LineageModal';
+import { ShopModal } from '../components/ShopModal';
+import { CareerModal } from '../components/CareerModal';
 import {
   LCD_BG,
   LCD_DARK,
@@ -66,6 +75,13 @@ function formatAge(seconds: number): string {
   if (seconds < 3600)  return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
   return `${Math.floor(seconds / 86400)}d`;
+}
+
+// m:ss for the live work-shift timer
+function formatClock(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function causeOfDeathLabel(cause: CauseOfDeath): string {
@@ -379,6 +395,19 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   }, []);
   const handleCloseTree = useCallback(() => setTreeOpen(false), []);
 
+  // ── Economy (cat/dog): marketplace + jobs + education ──
+  const animal = isAnimal(pet.petType);
+  const econ = pet.economy;
+  const coins = coinsLabel(econ);
+  const working = isWorking(econ);
+  const job = currentJob(econ);
+  const [shopOpen, setShopOpen] = useState(false);
+  const [careerOpen, setCareerOpen] = useState(false);
+  const handleOpenShop = useCallback(() => setShopOpen(true), []);
+  const handleCloseShop = useCallback(() => setShopOpen(false), []);
+  const handleOpenCareer = useCallback(() => setCareerOpen(true), []);
+  const handleCloseCareer = useCallback(() => setCareerOpen(false), []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -418,6 +447,22 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 )}
               </View>
             </View>
+
+            {/* ── Money / work status (cat/dog) ── */}
+            {animal && !pet.isDead && (
+              <View style={styles.moneyRow}>
+                <PixelText variant="sm" color={LCD_DARK}>◈ {coins}</PixelText>
+                {working ? (
+                  <PixelText variant="tiny" color={LCD_SHADE2}>
+                    WORKING {formatClock(shiftElapsedSec(econ, pet.lastTick))} · +{shiftEarned(econ)}c
+                  </PixelText>
+                ) : (
+                  <PixelText variant="tiny" color={LCD_SHADE2}>
+                    {job !== null ? job.title : 'UNEMPLOYED'}
+                  </PixelText>
+                )}
+              </View>
+            )}
 
             {/* ── Pet sprite + stage caption ── */}
             <View style={styles.spriteRow}>
@@ -484,21 +529,32 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
             </View>
 
             {/* ── Action Buttons (profile-driven) ── */}
+            {/* FEED routes through the shop (food costs coins); animals also get WORK. */}
             <View style={styles.actionGrid}>
               <View style={styles.buttonRow}>
                 {profile.actions.map((key) => {
                   const spec = ACTION_SPECS[key];
+                  const isFeed = key === 'feed';
                   return (
                     <PixelButton
                       key={key}
                       label={spec.label}
                       glyph={spec.glyph}
-                      onPress={() => spec.run(actions)}
+                      onPress={isFeed ? handleOpenShop : () => spec.run(actions)}
                       disabled={pet.isDead}
-                      accessibilityLabel={spec.accessibilityLabel}
+                      accessibilityLabel={isFeed ? 'Open the food shop to feed your pet' : spec.accessibilityLabel}
                     />
                   );
                 })}
+                {animal && (
+                  <PixelButton
+                    label="WORK"
+                    glyph="$"
+                    onPress={handleOpenCareer}
+                    disabled={pet.isDead}
+                    accessibilityLabel="Open career — jobs, working, and school"
+                  />
+                )}
               </View>
             </View>
 
@@ -599,6 +655,27 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
       )}
 
       <LineageModal visible={treeOpen} lineage={lineage} current={pet} onClose={handleCloseTree} />
+
+      {animal && (
+        <>
+          <ShopModal
+            visible={shopOpen}
+            coins={coins}
+            onBuy={actions.buyFood}
+            onClose={handleCloseShop}
+          />
+          <CareerModal
+            visible={careerOpen}
+            economy={econ}
+            now={pet.lastTick}
+            onChooseJob={actions.chooseJob}
+            onQuit={actions.quitJob}
+            onToggleWork={actions.toggleWork}
+            onEnroll={actions.enroll}
+            onClose={handleCloseCareer}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -630,6 +707,12 @@ const styles = StyleSheet.create({
   topRight: {
     flexDirection: 'row',
     alignItems:    'center',
+  },
+  moneyRow: {
+    flexDirection:  'row',
+    justifyContent: 'space-between',
+    alignItems:     'center',
+    marginTop:      SPACE_2,
   },
   changeBtn: {
     marginLeft: SPACE_4,

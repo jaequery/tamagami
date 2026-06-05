@@ -1,7 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CURRENT_VERSION, STORAGE_KEY } from './constants';
 import { RARITIES } from './evolution';
-import type { PetState, PetType, Rarity } from './types';
+import {
+  defaultEconomy,
+  jobById,
+  MAX_EDUCATION,
+} from './economy';
+import type { PetEconomy, PetState, PetType, Rarity } from './types';
 
 // ─── Runtime validation ───────────────────────────────────────────────────────
 
@@ -11,6 +16,50 @@ const VALID_CAUSES = [null, 'starvation', 'thirst', 'neglect'];
 /** Returns true iff value is a finite number within [min, max] (inclusive). */
 function isFiniteInRange(value: unknown, min: number, max: number): boolean {
   return typeof value === 'number' && isFinite(value) && value >= min && value <= max;
+}
+
+/**
+ * Coerce a parsed `economy` blob into a valid PetEconomy. Lenient by design —
+ * the economy was added after v3 shipped, so a missing or partly-malformed
+ * economy is repaired to sane defaults rather than invalidating the whole save
+ * (which would needlessly reset the player's pet). Mirrors the events/generation
+ * tolerance policy. Unknown job ids and out-of-range numbers fall back cleanly.
+ */
+function validateEconomy(raw: unknown): PetEconomy {
+  const base = defaultEconomy();
+  if (typeof raw !== 'object' || raw === null) return base;
+  const e = raw as Record<string, unknown>;
+
+  const coins = isFiniteInRange(e.coins, 0, Number.MAX_SAFE_INTEGER) ? (e.coins as number) : base.coins;
+  const education = isFiniteInRange(e.education, 0, MAX_EDUCATION) ? Math.floor(e.education as number) : 0;
+
+  // A job id is only honored if it still exists in the table.
+  const jobId = typeof e.jobId === 'string' && jobById(e.jobId) !== null ? e.jobId : null;
+
+  // Shift state is only meaningful while clocked in to a known job.
+  const clockedInAt = jobId !== null && isFiniteInRange(e.clockedInAt, 0, Number.MAX_SAFE_INTEGER)
+    ? (e.clockedInAt as number)
+    : null;
+  const shiftSeconds = clockedInAt !== null && isFiniteInRange(e.shiftSeconds, 0, Number.MAX_SAFE_INTEGER)
+    ? (e.shiftSeconds as number)
+    : 0;
+
+  // Study state is only meaningful as a (id, endsAt) pair.
+  const studyId = typeof e.studyId === 'string' ? e.studyId : null;
+  const studyEndsAt = studyId !== null && isFiniteInRange(e.studyEndsAt, 0, Number.MAX_SAFE_INTEGER)
+    ? (e.studyEndsAt as number)
+    : null;
+  const studyValid = studyId !== null && studyEndsAt !== null;
+
+  return {
+    coins,
+    education,
+    jobId,
+    clockedInAt,
+    shiftSeconds,
+    studyId: studyValid ? studyId : null,
+    studyEndsAt: studyValid ? studyEndsAt : null,
+  };
 }
 
 /**
@@ -84,6 +133,7 @@ function validatePetState(parsed: unknown): PetState | null {
     causeOfDeath: p.causeOfDeath as PetState['causeOfDeath'],
     events,
     generation,
+    economy: validateEconomy(p.economy),
     stats: {
       hunger: s.hunger as number,
       happiness: s.happiness as number,

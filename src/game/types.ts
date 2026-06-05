@@ -32,6 +32,21 @@ export interface PetStats {
   water: number;     // 0..100  (plant)   — the single plant care stat; 0 = death
 }
 
+/**
+ * The money layer (cat/dog only; plant care stays free). Lives on the pet so a
+ * bloodline's wealth, career, and schooling persist with the save and migrate
+ * tolerantly — old v3 saves are seeded with defaultEconomy(). See game/economy.ts.
+ */
+export interface PetEconomy {
+  coins: number;             // balance (kept as a float; display floors it)
+  education: number;         // completed education levels (0 = none, up to MAX_EDUCATION)
+  jobId: string | null;      // current job, null = unemployed
+  clockedInAt: number | null;// epoch ms the current shift started, null = off the clock
+  shiftSeconds: number;      // worked+paid seconds banked this shift (≤ shift cap)
+  studyId: string | null;    // education program in progress, null = not studying
+  studyEndsAt: number | null;// epoch ms the current study graduates
+}
+
 export interface PetState {
   version: number;
   petType: PetType;
@@ -45,6 +60,7 @@ export interface PetState {
   ageSeconds: number;    // total seconds alive
   events: string[];      // world-event ids this pet has witnessed (its aura). See game/events.ts
   generation: number;    // 1 for a founder; +1 for each heir that continues the line
+  economy: PetEconomy;   // currency · marketplace · jobs · education (animals only)
 }
 
 export interface PetActions {
@@ -57,6 +73,12 @@ export interface PetActions {
   selectType(petType: PetType, name?: string): void; // create / restart a pet
   reset(): void;                                     // clear pet → back to selection
   rename(name: string): void;
+  // ── Economy (cat/dog) ──
+  buyFood(foodId: string): void;                     // spend coins to feed
+  chooseJob(jobId: string): void;                    // take a job you qualify for
+  quitJob(): void;                                   // leave your job
+  toggleWork(): void;                                // clock in / clock out
+  enroll(): void;                                    // enroll in the next education program
 }
 
 // ─── Social / nearby ──────────────────────────────────────────────────────────

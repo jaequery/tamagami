@@ -2,6 +2,16 @@ import type { CauseOfDeath, Mood, PetState, PetType } from './types';
 import { isAnimal } from './profiles';
 import { rollRarityWithLuck, rollHeirRarity } from './evolution';
 import {
+  clockIn as econClockIn,
+  clockOut as econClockOut,
+  defaultEconomy,
+  enroll as econEnroll,
+  foodById,
+  stepEconomy,
+  withJob,
+  withoutJob,
+} from './economy';
+import {
   CURRENT_VERSION,
   FEED_HAPPINESS_DELTA,
   FEED_HUNGER_BOOST,
@@ -60,6 +70,7 @@ export function createInitialPet(name: string, petType: PetType, now: number, lu
     ageSeconds: 0,
     events: [],
     generation: 1,
+    economy: defaultEconomy(),
   };
 }
 
@@ -75,6 +86,9 @@ export function createHeir(parent: PetState, now: number, luck = 0): PetState {
     ...base,
     rarity: rollHeirRarity(now, base.name, parent.petType, parent.rarity, luck),
     generation: (parent.generation ?? 1) + 1,
+    // The heir inherits the family savings — a bequest — but starts its own
+    // career and schooling from scratch.
+    economy: { ...defaultEconomy(), coins: parent.economy?.coins ?? defaultEconomy().coins },
   };
 }
 
@@ -123,8 +137,12 @@ function simulatePlant(state: PetState, now: number, elapsed: number, ageSeconds
 
 // ── Cat / dog: hunger + happiness drain; health follows; empty health → death ─
 function simulateAnimal(state: PetState, now: number, elapsed: number, ageSeconds: number): PetState {
+  // Advance the economy first: graduate finished study, bank shift wages, and
+  // collect the happiness cost of working (negative) to fold into the mood decay.
+  const { economy, happinessDelta } = stepEconomy(state.economy, now);
+
   const hunger = clamp(state.stats.hunger - HUNGER_DECAY_PER_SECOND * elapsed);
-  const happiness = clamp(state.stats.happiness - HAPPINESS_DECAY_PER_SECOND * elapsed);
+  const happiness = clamp(state.stats.happiness - HAPPINESS_DECAY_PER_SECOND * elapsed + happinessDelta);
 
   let health = state.stats.health;
   const hungerCritical = hunger <= HUNGER_CRITICAL_THRESHOLD;
@@ -150,6 +168,7 @@ function simulateAnimal(state: PetState, now: number, elapsed: number, ageSecond
     isDead,
     causeOfDeath,
     stats: { ...state.stats, hunger, happiness, health },
+    economy,
   };
 }
 
@@ -232,6 +251,64 @@ export function witnessEvent(state: PetState, eventId: string, now: number): Pet
   const simulated = simulate(state, now);
   if (simulated.isDead || simulated.events.includes(eventId)) return simulated;
   return { ...simulated, events: [...simulated.events, eventId] };
+}
+
+// ─── Economy reducers (cat / dog) ─────────────────────────────────────────────
+// Each simulates to `now` first (so wages/study are banked up to the moment of
+// the action) and then applies one economy change. All are no-ops on a dead pet,
+// a plant, or an invalid/unaffordable action — guards mirror the pure economy fns.
+
+/** Spend coins to feed. Restores hunger + a little happiness per the food def.
+ *  No-op if the food is unknown or unaffordable (the shop UI gates this too). */
+export function buyFood(state: PetState, foodId: string, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  const food = foodById(foodId);
+  if (food === null || simulated.economy.coins < food.price) return simulated;
+  return {
+    ...simulated,
+    stats: {
+      ...simulated.stats,
+      hunger: clamp(simulated.stats.hunger + food.hunger),
+      happiness: clamp(simulated.stats.happiness + food.happiness),
+    },
+    economy: { ...simulated.economy, coins: simulated.economy.coins - food.price },
+  };
+}
+
+/** Take a job you qualify for. */
+export function chooseJob(state: PetState, jobId: string, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  return { ...simulated, economy: withJob(simulated.economy, jobId) };
+}
+
+/** Quit your job (and clock out). */
+export function quitJob(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead) return simulated;
+  return { ...simulated, economy: withoutJob(simulated.economy) };
+}
+
+/** Clock in to start earning. No-op if unemployed or already on the clock. */
+export function clockIn(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  return { ...simulated, economy: econClockIn(simulated.economy, now) };
+}
+
+/** Clock out. Wages up to `now` were banked by the simulate() above. */
+export function clockOut(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead) return simulated;
+  return { ...simulated, economy: econClockOut(simulated.economy) };
+}
+
+/** Enroll in the next education program (pay tuition, start the study timer). */
+export function enroll(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  return { ...simulated, economy: econEnroll(simulated.economy, now) };
 }
 
 export function restart(state: PetState, now: number, petType?: PetType, name?: string): PetState {

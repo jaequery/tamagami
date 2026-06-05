@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
+  buyFood,
+  chooseJob,
+  clockIn,
+  clockOut,
   createHeir,
   createInitialPet,
+  enroll,
   feed,
   getMood,
   play,
+  quitJob,
   rename as engineRename,
   simulate,
   socialize,
   water,
   witnessEvent,
 } from '../game/engine';
+import { isWorking } from '../game/economy';
 import { appendAncestor, ancestorFrom } from '../game/lineage';
 import { loadCharm } from '../game/social';
 import { consumeGiftLuck } from '../game/gift';
@@ -205,6 +212,34 @@ export function usePet(): UsePet {
     applyState(engineRename(petRef.current, name), true);
   }, [applyState]);
 
+  // ── Economy actions (cat/dog) ──
+  const actionBuyFood = useCallback((foodId: string) => {
+    if (petRef.current === null) return;
+    applyState(buyFood(petRef.current, foodId, Date.now()), true);
+  }, [applyState]);
+
+  const actionChooseJob = useCallback((jobId: string) => {
+    if (petRef.current === null) return;
+    applyState(chooseJob(petRef.current, jobId, Date.now()), true);
+  }, [applyState]);
+
+  const actionQuitJob = useCallback(() => {
+    if (petRef.current === null) return;
+    applyState(quitJob(petRef.current, Date.now()), true);
+  }, [applyState]);
+
+  const actionToggleWork = useCallback(() => {
+    const cur = petRef.current;
+    if (cur === null) return;
+    const now = Date.now();
+    applyState(isWorking(cur.economy) ? clockOut(cur, now) : clockIn(cur, now), true);
+  }, [applyState]);
+
+  const actionEnroll = useCallback(() => {
+    if (petRef.current === null) return;
+    applyState(enroll(petRef.current, Date.now()), true);
+  }, [applyState]);
+
   const actions: PetActions = useMemo(() => ({
     feed: actionFeed,
     play: actionPlay,
@@ -215,7 +250,12 @@ export function usePet(): UsePet {
     selectType: actionSelectType,
     reset: actionReset,
     rename: actionRename,
-  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionContinueLine, actionSelectType, actionReset, actionRename]);
+    buyFood: actionBuyFood,
+    chooseJob: actionChooseJob,
+    quitJob: actionQuitJob,
+    toggleWork: actionToggleWork,
+    enroll: actionEnroll,
+  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionContinueLine, actionSelectType, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
 
   return {
     pet,

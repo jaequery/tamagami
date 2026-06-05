@@ -99,3 +99,23 @@ export const LINEAGE_KEY = '@tama/lineage/v1';
 // at the recipient's next hatch — closes the share → install → reward loop.
 export const GIFT_KEY = '@tama/gift/v1';
 export const GIFT_LUCK_CAP = 3;
+
+// ─── Economy (currency · marketplace · jobs · education) ──────────────────────
+// The animal (cat/dog) care loop now has money behind it: feeding means buying
+// food, food costs coins, coins come from working a job, and better-paying jobs
+// require education you pay for. The plant stays free/zen (water only) — its
+// economy is never surfaced. The economy lives inside PetState.economy and is
+// migrated tolerantly (old v3 saves seed a default), like `events`/`generation`.
+
+// Seed coins so a fresh pet can buy a meal or two before its first paycheck —
+// avoids a dead-end where you can't afford food and have no income yet.
+export const STARTING_COINS = 60;
+
+// Wages are quoted "per hour". We compress an in-game hour to this many real
+// seconds so a short play session actually earns something — 1 hour = 1 minute.
+export const WORK_SECONDS_PER_HOUR = 60;
+
+// A single shift caps here, so leaving the pet clocked-in (even backgrounded for
+// days) only ever banks one shift of pay — you must clock out + back in to earn
+// more. 8 in-game hours = 480 real seconds.
+export const WORK_SHIFT_MAX_SECONDS = 8 * WORK_SECONDS_PER_HOUR;
