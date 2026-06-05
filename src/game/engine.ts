@@ -1,6 +1,6 @@
 import type { CauseOfDeath, Mood, PetState, PetType } from './types';
 import { isAnimal } from './profiles';
-import { rollRarityWithLuck, rollHeirRarity } from './evolution';
+import { rollRarityWithLuck, rollHeirRarity, stageFor } from './evolution';
 import { rollOrigin } from './origins';
 import { rollHousehold, startingCoinsForHousehold, parseHouseholdId } from './household';
 import { BOND_SEED, deepenBond, dimBondForAbsence } from './bond';
@@ -10,9 +10,11 @@ import {
   applyOwnerEvent,
   ownerEventAt,
   startOwnerStage,
+  type OwnerEvent,
 } from './ownerLife';
 import { ownerStageForGeneration, NATURAL_LIFESPAN_SECONDS } from './lifespan';
-import { treatedDayFor } from './sickness';
+import { treatedDayFor, activeAilment, type Ailment } from './sickness';
+import { momentOfDay, type Moment, type MoodBand } from './moments';
 import {
   clockIn as econClockIn,
   clockOut as econClockOut,
@@ -110,6 +112,30 @@ export function ownerStageOf(pet: PetState): ReturnType<typeof startOwnerStage> 
   const parsed = parseHouseholdId(pet.household);
   const start = parsed ? startOwnerStage(parsed.situation) : 'adult';
   return ownerStageForGeneration(start, pet.generation ?? 1);
+}
+
+// ─── Screen-facing "today" reads (the daily firehoses, surfaced) ────────────────
+// Thin wrappers so the UI reads the §4/§5/§9 systems off a pet without knowing the
+// seed conventions. All pure + deterministic from the pet + now.
+
+/** The per-pet seed for her own daily beats (moments, ailments). */
+export function petSeed(pet: PetState): string {
+  return `${pet.bornAt}:${pet.name}`;
+}
+
+/** Her person's event for the local day containing `now` (§5). */
+export function ownerEventToday(pet: PetState, now: number): OwnerEvent {
+  return ownerEventAt(now, ownerSeedFor(pet), ownerStageOf(pet));
+}
+
+/** Today's ailment she needs help with, or null if she's well / already tended (§9). */
+export function currentAilment(pet: PetState, now: number): Ailment | null {
+  return activeAilment(now, petSeed(pet), pet.ageSeconds, pet.lastTreatedDay ?? null);
+}
+
+/** Today's catchable moment for her stage + mood, or null before she's hatched (§4). */
+export function momentToday(pet: PetState, now: number, mood: MoodBand): Moment | null {
+  return momentOfDay(now, petSeed(pet), stageFor(pet.ageSeconds), mood);
 }
 
 /**

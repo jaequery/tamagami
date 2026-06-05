@@ -948,11 +948,15 @@ retention layer** (the sure thing) and the **lock-screen day/night poses** (the 
 
 ---
 
-## V1 build status — the deterministic engine layer (shipped)
+## V1 build status — engines + screens wired (shipped)
 
-The pure, deterministic, fully-tested engine spine for every section now exists (all FNV-seeded off the
-birth identity, no `Math.random`, all save-tolerant with no version bump). What remains per section is the
-**UI/cinematics and the hand-pixeled sprite/Swift art**, which need a simulator to build and verify.
+The pure, deterministic, fully-tested engine spine for every section exists (all FNV-seeded off the birth
+identity, no `Math.random`, all save-tolerant with no version bump) **and is now surfaced in the live
+screens**: HomeScreen shows cat-years + cat stage names, season + weather, a TODAY panel (sickness→TEND,
+her person's day→COMFORT/CELEBRATE, a catchable daily moment), a [STORY] modal (origin + home + the
+unmetered bond), and a life-summary death screen; the name step carries the §3 ceremony copy. What remains
+per section is the **cold-open cinematics and the hand-pixeled sprite/Swift-widget art**, which need a
+simulator to build and verify.
 
 | § | Felt beat | Engine (shipped + tested) | Still needs (UI / art) |
 |---|---|---|---|

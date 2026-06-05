@@ -31,6 +31,16 @@ import {
 import { paletteForRarity, rarityAccent } from '../game/palettes';
 import { loadDiscovered, recordDiscovered } from '../game/codex';
 import { phaseOfDay, phaseLabel, isNight } from '../game/world';
+import { seasonOf, seasonLabel, weatherOf, weatherLabel } from '../game/season';
+import { displayedAgeLabel, catStageLabel } from '../game/lifespan';
+import { ownerEventToday, currentAilment, momentToday } from '../game/engine';
+import { householdFromId } from '../game/household';
+import { buildLifeSummary } from '../game/lifeSummary';
+import { loadCaughtMoments, recordCaughtMoment } from '../game/momentCodex';
+import { dayIndex } from '../game/events';
+import type { Ailment } from '../game/sickness';
+import type { OwnerEvent } from '../game/ownerLife';
+import type { Moment, MoodBand } from '../game/moments';
 import type { PetActivity } from '../game/animations';
 import { activeEventAt, eventById, type GameEvent } from '../game/events';
 import { loadWitnessed, recordWitnessed } from '../game/eventCodex';
@@ -51,6 +61,7 @@ import { EventReveal } from '../components/EventReveal';
 import { LineageModal } from '../components/LineageModal';
 import { ShopModal } from '../components/ShopModal';
 import { CareerModal } from '../components/CareerModal';
+import { StoryModal } from '../components/StoryModal';
 import {
   LCD_BG,
   LCD_DARK,
@@ -90,6 +101,8 @@ function causeOfDeathLabel(cause: CauseOfDeath): string {
     case 'starvation': return 'STARVATION';
     case 'thirst':     return 'THIRST';
     case 'neglect':    return 'NEGLECT';
+    case 'oldAge':     return 'OLD AGE';
+    case 'illness':    return 'ILLNESS';
     default:           return 'UNKNOWN';
   }
 }
@@ -151,7 +164,13 @@ interface DeathOverlayProps {
 }
 
 function DeathOverlay({ pet, onContinueLine, onShare, onNewPet }: DeathOverlayProps): React.ReactElement {
+  // The life-summary — her whole story, told now because it's over (§9/§10). For a
+  // plant (no life-story fields surface) we fall back to the epitaph.
+  const animal = isAnimal(pet.petType);
+  const summary = animal ? buildLifeSummary(pet) : null;
   const epitaph = epitaphFor(pet.name, pet.bornAt);
+  const gentle = pet.causeOfDeath === 'oldAge';
+
   return (
     <View style={deathStyles.overlay} accessible accessibilityLabel="Your pet has died">
       <View style={deathStyles.ghostContainer}>
@@ -159,28 +178,41 @@ function DeathOverlay({ pet, onContinueLine, onShare, onNewPet }: DeathOverlayPr
       </View>
 
       <PixelText variant="md" color={LCD_DARK} style={deathStyles.title}>
-        R.I.P.
+        {gentle ? 'GOODNIGHT' : 'R.I.P.'}
       </PixelText>
       <PixelText variant="sm" color={LCD_DARK} numberOfLines={1} style={deathStyles.cause}>
         {pet.name.toUpperCase()} · GEN {pet.generation}
       </PixelText>
-      <PixelText variant="sm" color={LCD_SHADE2} style={deathStyles.cause}>
-        CAUSE: {causeOfDeathLabel(pet.causeOfDeath)}
-      </PixelText>
-      <PixelText variant="tiny" color={LCD_SHADE2} style={deathStyles.epitaph}>
-        &quot;{epitaph}&quot;
-      </PixelText>
+
+      {summary !== null ? (
+        <ScrollView style={deathStyles.summaryScroll} contentContainerStyle={deathStyles.summaryInner} showsVerticalScrollIndicator={false}>
+          <PixelText variant="sm" color={LCD_DARK} style={deathStyles.summaryHeadline}>{summary.headline}</PixelText>
+          {summary.lines.map((line, i) => (
+            <PixelText key={i} variant="tiny" color={LCD_DARK} style={deathStyles.summaryLine}>{line}</PixelText>
+          ))}
+          <PixelText variant="tiny" color={LCD_SHADE2} style={deathStyles.summaryClosing}>{summary.closing}</PixelText>
+        </ScrollView>
+      ) : (
+        <>
+          <PixelText variant="sm" color={LCD_SHADE2} style={deathStyles.cause}>
+            CAUSE: {causeOfDeathLabel(pet.causeOfDeath)}
+          </PixelText>
+          <PixelText variant="tiny" color={LCD_SHADE2} style={deathStyles.epitaph}>
+            &quot;{epitaph}&quot;
+          </PixelText>
+        </>
+      )}
 
       <View style={deathStyles.continueRow}>
         <PixelButton
           label="CONTINUE LINE"
           glyph=">"
           onPress={onContinueLine}
-          accessibilityLabel="Continue the bloodline — hatch an heir that inherits this pet's traits"
+          accessibilityLabel="Continue the bloodline — a new kitten comes to the same person, who remembers her"
         />
       </View>
       <View style={deathStyles.buttonRow}>
-        <PixelButton label="SHARE" onPress={onShare} accessibilityLabel="Share a tombstone card" />
+        <PixelButton label="SHARE" onPress={onShare} accessibilityLabel="Share her life-summary card" />
         <PixelButton label="NEW PET" onPress={onNewPet} accessibilityLabel="Start a fresh new pet" />
       </View>
     </View>
@@ -210,6 +242,29 @@ const deathStyles = StyleSheet.create({
     marginTop:    SPACE_2,
     marginBottom: SPACE_8,
     textAlign:    'center',
+  },
+  summaryScroll: {
+    maxHeight:    140,
+    marginTop:    SPACE_4,
+    marginBottom: SPACE_6,
+  },
+  summaryInner: {
+    alignItems: 'center',
+    paddingHorizontal: SPACE_4,
+  },
+  summaryHeadline: {
+    textAlign:    'center',
+    marginBottom: SPACE_4,
+  },
+  summaryLine: {
+    textAlign:    'center',
+    lineHeight:   12,
+    marginBottom: SPACE_2,
+  },
+  summaryClosing: {
+    textAlign:  'center',
+    lineHeight: 12,
+    marginTop:  SPACE_4,
   },
   continueRow: {
     flexDirection: 'row',
@@ -255,6 +310,71 @@ function SocialBar({ nearbyName, btProblem, friendCount, onOpenFriends }: Social
       >
         <PixelText variant="tiny" color={LCD_SHADE2}>FRIENDS {friendCount}</PixelText>
       </TouchableOpacity>
+    </View>
+  );
+}
+
+// ─── Today panel ─────────────────────────────────────────────────────────────
+// The daily firehose, surfaced: today's worry (§9 sickness), her person's day
+// (§5, with the comfort/celebrate reciprocity), and her own catchable moment
+// (§4). This is the "what happened today?" pull that replaces the loot box.
+
+interface TodayPanelProps {
+  ailment: Ailment | null;
+  onTend: () => void;
+  ownerEvent: OwnerEvent;
+  person: string;
+  comforted: boolean;
+  onComfort: () => void;
+  moment: Moment | null;
+  momentCaught: boolean;
+  onCatch: () => void;
+}
+
+function TodayPanel({
+  ailment, onTend, ownerEvent, person, comforted, onComfort, moment, momentCaught, onCatch,
+}: TodayPanelProps): React.ReactElement {
+  const responseLabel = ownerEvent.response === 'celebrate' ? 'CELEBRATE' : 'COMFORT';
+  return (
+    <View style={styles.todayPanel}>
+      {/* Worry first — she needs help (§9). */}
+      {ailment !== null && (
+        <View style={styles.todayBlock}>
+          <PixelText variant="tiny" color={COLOR_WARNING} style={styles.todayText}>
+            {ailment.label}: {ailment.text}
+          </PixelText>
+          <PixelButton label="TEND" glyph="+" onPress={onTend} accessibilityLabel={`Tend her — ${ailment.text}`} />
+        </View>
+      )}
+
+      {/* Her person's day (§5). */}
+      <View style={styles.todayBlock}>
+        <PixelText variant="tiny" color={LCD_DARK} style={styles.todayText}>
+          {person.toUpperCase()}: {ownerEvent.text}
+        </PixelText>
+        {ownerEvent.response !== 'none' && (
+          comforted ? (
+            <PixelText variant="tiny" color={LCD_SHADE2} style={styles.todayDone}>✦ {ownerEvent.responseText}</PixelText>
+          ) : (
+            <PixelButton label={responseLabel} glyph="♥" onPress={onComfort} accessibilityLabel={`Be there for ${person}`} />
+          )
+        )}
+      </View>
+
+      {/* Her own catchable moment (§4) — tap to keep it. */}
+      {moment !== null && (
+        <TouchableOpacity
+          onPress={onCatch}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityLabel={momentCaught ? 'Moment caught' : `Catch this moment: ${moment.text}`}
+          style={styles.todayBlock}
+        >
+          <PixelText variant="tiny" color={momentCaught ? LCD_SHADE2 : LCD_DARK} style={styles.todayText}>
+            {momentCaught ? '✦ ' : ''}{moment.text}
+          </PixelText>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -445,6 +565,56 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
     triggerActivity('cheer');
   }, [meet, triggerActivity]);
 
+  // ── Life systems: season/weather (§7), her person's day (§5), her moment (§4),
+  //    her health (§9), and the story surface (§1/§2/§8) ──
+  const season = seasonOf(clockNow);
+  const weather = weatherOf(clockNow);
+  const todayKey = dayIndex(clockNow);
+  const animalAlive = animal && !pet.isDead;
+  const ailment = animalAlive ? currentAilment(pet, clockNow) : null;
+  const ownerEvent = animalAlive ? ownerEventToday(pet, clockNow) : null;
+  const moodBand: MoodBand = mood === 'happy' ? 'happy' : mood === 'sad' ? 'sad' : 'neutral';
+  const moment = animalAlive ? momentToday(pet, clockNow, moodBand) : null;
+  const household = householdFromId(pet.household);
+
+  const [storyOpen, setStoryOpen] = useState(false);
+  const handleOpenStory = useCallback(() => setStoryOpen(true), []);
+  const handleCloseStory = useCallback(() => setStoryOpen(false), []);
+
+  // "Comforted today" hides the comfort button + shows the cat's act; it naturally
+  // re-arms on a new day (the compare misses tomorrow's day-index).
+  const [comfortedDay, setComfortedDay] = useState<number | null>(null);
+  const [caughtMoments, setCaughtMoments] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadCaughtMoments().then((s) => { if (!cancelled) setCaughtMoments(s); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleComfort = useCallback(() => {
+    actions.comfortOwner();
+    setComfortedDay(dayIndex(Date.now()));
+    triggerActivity('cheer');
+  }, [actions, triggerActivity]);
+
+  const handleTend = useCallback(() => {
+    actions.treat();
+    triggerActivity('eat');
+  }, [actions, triggerActivity]);
+
+  const handleCatchMoment = useCallback(() => {
+    if (moment === null) return;
+    const id = moment.id;
+    void recordCaughtMoment(id).then(() => {
+      setCaughtMoments((cur) => (cur.has(id) ? cur : new Set(cur).add(id)));
+    });
+  }, [moment]);
+
+  // ── Display labels: cat-facing age + stage (§6), or raw for the plant ──
+  const ageLabel = animal ? displayedAgeLabel(pet.ageSeconds) : formatAge(pet.ageSeconds);
+  const stageLabel = animal ? catStageLabel(stage) : stage.toUpperCase();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -469,7 +639,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
               </View>
               <View style={styles.topRight}>
                 <PixelText variant="tiny" color={LCD_SHADE2}>
-                  {profile.title} {formatAge(pet.ageSeconds)}
+                  {profile.title} {ageLabel}
                 </PixelText>
                 {!pet.isDead && (
                   <TouchableOpacity
@@ -536,7 +706,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
               ) : (
                 caption !== null && (
                   <View style={styles.caption}>
-                    <PixelText variant="tiny" color={LCD_SHADE2}>{caption}</PixelText>
+                    <PixelText variant="tiny" color={LCD_SHADE2}>{rarityEpithet(pet.rarity)} {stageLabel}</PixelText>
                     {aura.length > 0 && (
                       <PixelText variant="tiny" color={LCD_DARK} style={styles.captionSub}>
                         ✦ {aura}
@@ -553,7 +723,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
             ) : (
               !pet.isDead && (
                 <PixelText variant="tiny" color={LCD_SHADE2} style={styles.phaseLine}>
-                  · {phaseLabel(phase)} ·
+                  · {phaseLabel(phase)} · {seasonLabel(season)} · {weatherLabel(weather)} ·
                 </PixelText>
               )
             )}
@@ -607,7 +777,22 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
               </View>
             </View>
 
-            {/* ── Share / Codex controls ── */}
+            {/* ── Today: her person's day, her moment, her health (§4/§5/§9) ── */}
+            {animalAlive && ownerEvent !== null && household !== null && (
+              <TodayPanel
+                ailment={ailment}
+                onTend={handleTend}
+                ownerEvent={ownerEvent}
+                person={household.person}
+                comforted={comfortedDay === todayKey}
+                onComfort={handleComfort}
+                moment={moment}
+                momentCaught={moment !== null && caughtMoments.has(moment.id)}
+                onCatch={handleCatchMoment}
+              />
+            )}
+
+            {/* ── Share / Story / Codex controls ── */}
             <View style={styles.metaBar}>
               <TouchableOpacity
                 onPress={handleOpenShare}
@@ -617,6 +802,16 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
               >
                 <PixelText variant="tiny" color={LCD_DARK}>[SHARE]</PixelText>
               </TouchableOpacity>
+              {animal && (
+                <TouchableOpacity
+                  onPress={handleOpenStory}
+                  hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open her story — origin, home, and the bond"
+                >
+                  <PixelText variant="tiny" color={LCD_DARK}>[STORY]</PixelText>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={handleOpenTree}
                 hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
@@ -705,6 +900,8 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
 
       <LineageModal visible={treeOpen} lineage={lineage} current={pet} onClose={handleCloseTree} />
 
+      {animal && <StoryModal visible={storyOpen} pet={pet} onClose={handleCloseStory} />}
+
       {animal && (
         <>
           <ShopModal
@@ -788,6 +985,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop:  SPACE_4,
     opacity:    0.7,
+  },
+  todayPanel: {
+    marginTop:       SPACE_4,
+    paddingTop:      SPACE_4,
+    paddingHorizontal: SPACE_2,
+    borderTopWidth:  BORDER_WIDTH,
+    borderTopColor:  LCD_SHADE2,
+  },
+  todayBlock: {
+    marginBottom:  SPACE_4,
+    alignItems:    'center',
+  },
+  todayText: {
+    textAlign:    'center',
+    lineHeight:   12,
+    marginBottom: SPACE_2,
+  },
+  todayDone: {
+    textAlign:  'center',
+    lineHeight: 12,
   },
   metaBar: {
     flexDirection:  'row',

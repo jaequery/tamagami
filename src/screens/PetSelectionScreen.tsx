@@ -94,6 +94,9 @@ function NameStep({ petType, onConfirm, onBack }: NameStepProps): React.ReactEle
       <PixelText variant="sm" color={LCD_DARK} style={styles.heading}>
         NAME YOUR {profile.title}
       </PixelText>
+      <PixelText variant="tiny" color={LCD_SHADE2} style={styles.subheading}>
+        THE SMALL ONES BECOME SOMEONE THE MOMENT THEY&apos;RE NAMED
+      </PixelText>
 
       <View style={styles.namePreview}>
         <PetSprite petType={petType} mood="happy" />
