@@ -23,15 +23,18 @@ import {
   shiftMaxed,
 } from './economy';
 import { STARTING_COINS, WORK_SHIFT_MAX_SECONDS } from './constants';
+import { startingCoinsForHousehold } from './household';
 import type { PetEconomy, PetState } from './types';
 
 const NOW = 1_700_000_000_000;
 
+// Pin the starting balance to the flat default so these tests isolate economy
+// mechanics from the §2 household tier (which now seeds coins in createInitialPet).
 function cat(econ?: Partial<PetEconomy>, stats?: Partial<PetState['stats']>): PetState {
   const base = createInitialPet('Test', 'cat', NOW);
   return {
     ...base,
-    economy: { ...base.economy, ...econ },
+    economy: { ...base.economy, coins: STARTING_COINS, ...econ },
     stats: { ...base.stats, ...stats },
   };
 }
@@ -41,7 +44,10 @@ function cat(econ?: Partial<PetEconomy>, stats?: Partial<PetState['stats']>): Pe
 describe('economy seeding', () => {
   it('seeds a fresh pet with starting coins, no job, no education', () => {
     const pet = createInitialPet('Test', 'cat', NOW);
-    expect(pet.economy.coins).toBe(STARTING_COINS);
+    // Starting coins are now set by the §2 household material tier — a positive
+    // balance derived deterministically from the pet's dealt household.
+    expect(pet.economy.coins).toBe(startingCoinsForHousehold(pet.household));
+    expect(pet.economy.coins).toBeGreaterThan(0);
     expect(pet.economy.jobId).toBeNull();
     expect(pet.economy.education).toBe(0);
     expect(isWorking(pet.economy)).toBe(false);
@@ -82,7 +88,8 @@ describe('buyFood', () => {
   it('is a no-op on a plant (free care, no economy)', () => {
     const plant = createInitialPet('Sprout', 'plant', NOW);
     const after = buyFood(plant, 'meal', NOW);
-    expect(after.economy.coins).toBe(STARTING_COINS);
+    // buyFood does nothing to a plant — its balance is untouched, whatever it seeded.
+    expect(after.economy.coins).toBe(plant.economy.coins);
   });
 });
 

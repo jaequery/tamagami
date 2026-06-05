@@ -13,8 +13,11 @@ import { captureRef } from 'react-native-view-shot';
 import * as Haptics from 'expo-haptics';
 import type { CauseOfDeath, PetState } from '../game/types';
 import { paletteForRarity, rarityAccent } from '../game/palettes';
-import { formName, rarityLabel, stageFor } from '../game/evolution';
+import { formName, rarityEpithet, rarityLabel, stageFor } from '../game/evolution';
 import { eventById } from '../game/events';
+import { isOriginId, originById } from '../game/origins';
+import { householdFromId } from '../game/household';
+import { lifeSummaryCaption } from '../game/lifeSummary';
 import { epitaphFor } from '../game/lineage';
 import { PetSprite } from './PetSprite';
 import { PixelText } from './PixelText';
@@ -48,6 +51,8 @@ function causeLabel(cause: CauseOfDeath): string {
     case 'starvation': return 'STARVATION';
     case 'thirst':     return 'THIRST';
     case 'neglect':    return 'NEGLECT';
+    case 'oldAge':     return 'OLD AGE';
+    case 'illness':    return 'ILLNESS';
     default:           return 'UNKNOWN';
   }
 }
@@ -72,17 +77,35 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
 
   const epitaph = epitaphFor(pet.name, pet.bornAt);
 
+  // The §1–2 life story, for the sealed Origin-Card caption (GAME.md §10).
+  const origin = isOriginId(pet.origin) ? originById(pet.origin) : null;
+  const household = householdFromId(pet.household);
+
   const handleShare = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     const deepLink = `tamagami://hatch?type=${pet.petType}&rarity=${pet.rarity}`;
     const touched = auraEvents.length > 0
       ? ` Touched by: ${auraEvents.map((e) => e.name).join(', ')}.`
       : '';
-    const message = pet.isDead
-      ? `R.I.P. ${name} the ${form} — gen ${pet.generation}, lived ${ageLabel}, lost to ${causeLabel(pet.causeOfDeath).toLowerCase()}. "${epitaph}".${touched}\n`
-        + `Raise your own on TAMAGAMI: ${deepLink}`
+
+    // Living pet → the Origin Card: lead with the WONDER (rarity epithet + her
+    // origin's drama) and where she landed, but WITHHOLD the form — the receiver
+    // has to install to see what she becomes (GAME.md §10: "seal, don't spoil").
+    // Falls back to the plain form line only if the life story is somehow absent.
+    const sentTo = household ? `, and sent to ${household.person}` : '';
+    const sealedOrigin = origin
+      ? `Something ${rarityEpithet(pet.rarity)} was ${origin.tone}${sentTo}. Meet ${name}.${touched}\n`
+        + `Hatch your own mystery pet: ${deepLink}`
       : `${name} the ${form} — ${ageLabel} old and thriving on TAMAGAMI (gen ${pet.generation}).${touched}\n`
         + `Hatch your own mystery pet: ${deepLink}`;
+
+    // Dead pet → the Life-Summary card (§9/§10): her whole story, told now
+    // *because* it's over — origin, person, who she became, what she witnessed,
+    // and the bond, named. A punchline and a tear.
+    const message = pet.isDead
+      ? `${lifeSummaryCaption(pet)}${touched}\n`
+        + `Raise your own on TAMAGAMI: ${deepLink}`
+      : sealedOrigin;
 
     // Capture the cartridge as a PNG and share image + caption together. iOS's
     // share sheet attaches the file (`url`) AND the text (with the install link).
@@ -97,7 +120,7 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
       // fall through to text-only
     }
     Share.share({ message }).catch(() => undefined);
-  }, [name, form, ageLabel, auraEvents, epitaph, pet.petType, pet.rarity, pet.isDead, pet.generation, pet.causeOfDeath]);
+  }, [pet, name, form, ageLabel, auraEvents, origin, household]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

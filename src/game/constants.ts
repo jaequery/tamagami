@@ -89,6 +89,11 @@ export const CODEX_KEY = '@tama/codex/v1';
 // Also permanent and save-independent. See game/eventCodex.ts and game/events.ts.
 export const EVENT_CODEX_KEY = '@tama/events/v1';
 
+// The set of daily "moments" (§4) and milestone firsts/lasts (§6) the player has
+// ever caught — the catch-and-keep collection. Permanent + save-independent, like
+// the event codex. See game/momentCodex.ts and game/moments.ts.
+export const MOMENT_CODEX_KEY = '@tama/moments/v1';
+
 // ─── Lineage (family tree) ────────────────────────────────────────────────────
 // The ordered list of past pets in a bloodline (graves). Permanent and
 // save-independent so the family tree survives reset. See game/lineage.ts.

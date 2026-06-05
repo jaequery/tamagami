@@ -1,4 +1,6 @@
 import {
+  comfortOwner,
+  createHeir,
   createInitialPet,
   feed,
   getMood,
@@ -7,12 +9,18 @@ import {
   restart,
   simulate,
   socialize,
+  treat,
   water,
 } from './engine';
+import { NATURAL_LIFESPAN_SECONDS } from './lifespan';
+import { bondLevel } from './bond';
+import { dayIndex } from './events';
 import {
   HUNGER_CRITICAL_THRESHOLD,
   MAX_CATCHUP_SECONDS,
 } from './constants';
+import { isOriginId } from './origins';
+import { isHouseholdId, startingCoinsForHousehold } from './household';
 import type { PetState, PetType } from './types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -39,6 +47,99 @@ describe('createInitialPet', () => {
     expect(pet.stats.water).toBe(100);
     expect(pet.name).toBe('Pixel');
     expect(pet.ageSeconds).toBe(0);
+  });
+});
+
+// ─── Life story: origin + household (GAME.md §1–2) ─────────────────────────────
+
+describe('createInitialPet — life story', () => {
+  it('deals a valid origin and household, and seeds coins from the household tier', () => {
+    const pet = createInitialPet('Pixel', 'cat', NOW);
+    expect(isOriginId(pet.origin)).toBe(true);
+    expect(isHouseholdId(pet.household)).toBe(true);
+    expect(pet.economy.coins).toBe(startingCoinsForHousehold(pet.household));
+  });
+
+  it('is deterministic — same birth identity, same life story', () => {
+    const a = createInitialPet('Pixel', 'cat', NOW);
+    const b = createInitialPet('Pixel', 'cat', NOW);
+    expect(a.origin).toBe(b.origin);
+    expect(a.household).toBe(b.household);
+  });
+});
+
+describe('createHeir — same owner, new birth', () => {
+  it('carries the household forward (same owner) but re-rolls the origin (new birth)', () => {
+    const parent = { ...createInitialPet('Maple', 'cat', NOW), isDead: true };
+    const heir = createHeir(parent, NOW + 1000);
+    // Same owner → same household.
+    expect(heir.household).toBe(parent.household);
+    // New birth → a freshly-dealt (valid) origin, and the next generation.
+    expect(isOriginId(heir.origin)).toBe(true);
+    expect(heir.generation).toBe(parent.generation + 1);
+  });
+
+  it('starts the bond fresh but carries the owner mood (a new kitten for the same person)', () => {
+    const parent = { ...createInitialPet('Maple', 'cat', NOW), isDead: true, bond: 90, ownerMood: 22 };
+    const heir = createHeir(parent, NOW + 1000);
+    expect(heir.bond).toBeLessThan(parent.bond); // new relationship
+    expect(heir.ownerMood).toBe(22);             // same person, same grief/joy
+  });
+});
+
+// ─── §8 bond + §9 the end ──────────────────────────────────────────────────────
+
+describe('bond grows with care', () => {
+  it('feeding and playing deepen the (invisible) bond', () => {
+    const pet = createInitialPet('Sol', 'cat', NOW);
+    const after = play(feed(pet, NOW), NOW);
+    expect(after.bond).toBeGreaterThan(pet.bond);
+  });
+});
+
+describe('old-age death (§9 — the good death)', () => {
+  it('a cat that reaches the natural lifespan dies gently of old age', () => {
+    const pet = { ...createInitialPet('Elder', 'cat', NOW), ageSeconds: NATURAL_LIFESPAN_SECONDS - 5 };
+    // Advance past the natural lifespan.
+    const after = simulate(pet, NOW + 10_000);
+    expect(after.isDead).toBe(true);
+    expect(after.causeOfDeath).toBe('oldAge');
+  });
+
+  it('a young, well-cared-for cat does not die', () => {
+    const pet = createInitialPet('Kit', 'cat', NOW);
+    const after = simulate(pet, NOW + 60_000);
+    expect(after.isDead).toBe(false);
+  });
+});
+
+describe('treat (§9 — tending an ailment)', () => {
+  it('stamps today and nudges the bond', () => {
+    const pet = createInitialPet('Patch', 'cat', NOW);
+    const after = treat(pet, NOW);
+    expect(after.lastTreatedDay).toBe(dayIndex(NOW));
+    expect(after.bond).toBeGreaterThan(pet.bond);
+  });
+
+  it('is a no-op on a dead pet', () => {
+    const dead = { ...createInitialPet('Patch', 'cat', NOW), isDead: true };
+    expect(treat(dead, NOW).lastTreatedDay).toBeNull();
+  });
+});
+
+describe('comfortOwner (§5 — the reciprocal heart)', () => {
+  it('lifts the owner mood and deepens the bond', () => {
+    const pet = { ...createInitialPet('Biscuit', 'cat', NOW), ownerMood: 30 };
+    const after = comfortOwner(pet, NOW);
+    expect(after.ownerMood).toBeGreaterThanOrEqual(30);
+    expect(after.bond).toBeGreaterThan(pet.bond);
+  });
+});
+
+describe('bond level read-out', () => {
+  it('a fresh pet is wary; a maxed bond is devoted', () => {
+    expect(bondLevel(createInitialPet('x', 'cat', NOW).bond)).toBe('wary');
+    expect(bondLevel(100)).toBe('devoted');
   });
 });
 

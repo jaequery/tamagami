@@ -5,6 +5,7 @@ import {
   chooseJob,
   clockIn,
   clockOut,
+  comfortOwner,
   createHeir,
   createInitialPet,
   enroll,
@@ -15,6 +16,7 @@ import {
   rename as engineRename,
   simulate,
   socialize,
+  treat,
   water,
   witnessEvent,
 } from '../game/engine';
@@ -176,6 +178,16 @@ export function usePet(): UsePet {
     applyState(witnessEvent(petRef.current, eventId, Date.now()), true);
   }, [applyState]);
 
+  const actionTreat = useCallback(() => {
+    if (petRef.current === null || petRef.current.isDead) return;
+    applyState(treat(petRef.current, Date.now()), true);
+  }, [applyState]);
+
+  const actionComfortOwner = useCallback(() => {
+    if (petRef.current === null || petRef.current.isDead) return;
+    applyState(comfortOwner(petRef.current, Date.now()), true);
+  }, [applyState]);
+
   // Death → continue the bloodline: archive the departed as an ancestor, then
   // hatch its heir (next generation, inherited rarity) in place — no trip back
   // to the selection screen.
@@ -246,6 +258,8 @@ export function usePet(): UsePet {
     water: actionWater,
     socialize: actionSocialize,
     witnessEvent: actionWitnessEvent,
+    treat: actionTreat,
+    comfortOwner: actionComfortOwner,
     continueLine: actionContinueLine,
     selectType: actionSelectType,
     reset: actionReset,
@@ -255,7 +269,7 @@ export function usePet(): UsePet {
     quitJob: actionQuitJob,
     toggleWork: actionToggleWork,
     enroll: actionEnroll,
-  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionContinueLine, actionSelectType, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
+  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
 
   return {
     pet,

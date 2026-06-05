@@ -3,7 +3,9 @@
 // cat and dog share the richer feed + play loop.
 export type PetType = 'plant' | 'cat' | 'dog';
 
-export type CauseOfDeath = 'starvation' | 'thirst' | 'neglect' | null;
+// 'oldAge' is the gentle, expected close to a long life (§9 — never a fail-state);
+// 'illness' is the rare grave end of an untreated serious sickness.
+export type CauseOfDeath = 'starvation' | 'thirst' | 'neglect' | 'oldAge' | 'illness' | null;
 export type Mood = 'happy' | 'neutral' | 'sad' | 'dead';
 
 // ─── Rarity ───────────────────────────────────────────────────────────────────
@@ -60,6 +62,11 @@ export interface PetState {
   ageSeconds: number;    // total seconds alive
   events: string[];      // world-event ids this pet has witnessed (its aura). See game/events.ts
   generation: number;    // 1 for a founder; +1 for each heir that continues the line
+  origin: string;        // her dealt origin scenario id (the §1 cold open). See game/origins.ts
+  household: string;     // her dealt household id — tier:situation:nameIdx. See game/household.ts
+  bond: number;          // §8 invisible affection 0..100, seeded low. See game/bond.ts
+  ownerMood: number;     // §5 her person's mood 0..100, ebbs on the real clock. See game/ownerLife.ts
+  lastTreatedDay: number | null; // §9 local day-index she was last treated for an ailment, or null
   economy: PetEconomy;   // currency · marketplace · jobs · education (animals only)
 }
 
@@ -69,6 +76,8 @@ export interface PetActions {
   water(): void;                                     // plant
   socialize(): void;                                 // any — boost from meeting a nearby pet
   witnessEvent(eventId: string): void;               // any — record a live world event onto the pet
+  treat(): void;                                     // §9 — tend an ailment (rest/vet/medicine); clears today's worry
+  comfortOwner(): void;                              // §5 — the cat is there for her person (deepens bond, lifts mood)
   continueLine(): void;                              // dead pet → hatch an heir that inherits the line
   selectType(petType: PetType, name?: string): void; // create / restart a pet
   reset(): void;                                     // clear pet → back to selection

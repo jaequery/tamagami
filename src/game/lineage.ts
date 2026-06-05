@@ -22,7 +22,7 @@ export interface Ancestor {
 }
 
 const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
-const CAUSES: readonly (CauseOfDeath)[] = [null, 'starvation', 'thirst', 'neglect'];
+const CAUSES: readonly (CauseOfDeath)[] = [null, 'starvation', 'thirst', 'neglect', 'oldAge', 'illness'];
 
 function isAncestor(v: unknown): v is Ancestor {
   if (typeof v !== 'object' || v === null) return false;

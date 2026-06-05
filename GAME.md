@@ -945,3 +945,34 @@ that lives on your real clock, even closed."*
 engine or a flagged, scoped new build. Next: turn it into a V1 build plan — the cheapest slice that proves
 the bet — starting with the two things the research says gate everything: the **forgiving care + reunion
 retention layer** (the sure thing) and the **lock-screen day/night poses** (the filmable lottery).*
+
+---
+
+## V1 build status — the deterministic engine layer (shipped)
+
+The pure, deterministic, fully-tested engine spine for every section now exists (all FNV-seeded off the
+birth identity, no `Math.random`, all save-tolerant with no version bump). What remains per section is the
+**UI/cinematics and the hand-pixeled sprite/Swift art**, which need a simulator to build and verify.
+
+| § | Felt beat | Engine (shipped + tested) | Still needs (UI / art) |
+|---|---|---|---|
+| 1 | Cold open — origin reveal | `origins.ts` (6 origins, rarity-biased, ★secret=secret-rarity) | womb→birth cinematics, `RevealOverlay` reframe |
+| 2 | The hands / household | `household.ts` (tier×situation→person, contrast line, tier→coins) | carry-home pan, person sprite |
+| 3 | First breath — clock wakes | `firstBreath.ts` (phase→wake/settle/sleep), `bond.ts` seed | naming ceremony screen, wake/sleep poses |
+| 4 | Daily life — surprises | `moments.ts` + `momentCodex.ts` (catch-and-keep) | moment animations, shop cosmetics |
+| 5 | The owner's life | `ownerLife.ts` (24 events, mood, comfort/celebrate) | owner pixel presence, event banners |
+| 6 | Growing up — two clocks | `lifespan.ts` (~4-wk curve, displayed age, owner aging) | per-stage cat sprites |
+| 7 | The world — sky + lock screen | `season.ts` (season + ambient weather + first snow) | **the WidgetKit day/night poses (the viral clip)** |
+| 8 | The bond — felt, never metered | `bond.ts` (invisible tiers, reunion, named-at-end) | emergent-behavior animations |
+| 9 | The end — sickness, old age | `sickness.ts`, old-age death in `engine.ts`, `lifeSummary.ts` | death hush overlay, vet/medicine shop items |
+| 10 | Artifacts — the cards | sealed Origin caption + Life-Summary caption in `ShareCard.tsx` | life-summary card skin |
+
+**State wiring:** `PetState` gained `origin`, `household`, `bond`, `ownerMood`, `lastTreatedDay` (all
+tolerant); `createInitialPet` deals them off the birth seed (tier→starting coins); `createHeir` carries the
+household + owner mood forward (same person) and re-rolls a fresh origin (new birth); `feed`/`play`/`treat`/
+`comfortOwner` move the bond; `simulate` drifts owner mood, dims the bond on long absence (reunion heals it),
+and ends a long life gently of old age. **280 tests green, `tsc` + `eslint` clean.**
+
+**Honest V2 flags (net-new code, earned after V1 proves the pull):** the living person as a visible pixel
+presence + logging *which* owner events the cat was there for (so the life-summary can say "the day he got
+the job"); learned real-clock memory (waiting at your usual bedtime); cosmetic render layer.*

@@ -1,6 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CURRENT_VERSION, STORAGE_KEY } from './constants';
 import { RARITIES } from './evolution';
+import { isOriginId, rollOrigin } from './origins';
+import { isHouseholdId, rollHousehold } from './household';
+import { BOND_SEED } from './bond';
+import { OWNER_MOOD_SEED } from './ownerLife';
 import {
   defaultEconomy,
   jobById,
@@ -11,7 +15,7 @@ import type { PetEconomy, PetState, PetType, Rarity } from './types';
 // ─── Runtime validation ───────────────────────────────────────────────────────
 
 const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
-const VALID_CAUSES = [null, 'starvation', 'thirst', 'neglect'];
+const VALID_CAUSES = [null, 'starvation', 'thirst', 'neglect', 'oldAge', 'illness'];
 
 /** Returns true iff value is a finite number within [min, max] (inclusive). */
 function isFiniteInRange(value: unknown, min: number, max: number): boolean {
@@ -120,6 +124,29 @@ function validatePetState(parsed: unknown): PetState | null {
     generation = Math.floor(p.generation as number);
   }
 
+  // ── origin + household: tolerant, and self-healing ────────────────────────
+  // The life-story facts (GAME.md §1–2) were added after v3 shipped. Both are
+  // pure deterministic rolls off the (validated) birth identity, so a missing or
+  // malformed value isn't a reason to reset the player's pet — we simply re-derive
+  // the exact same origin/household it would have had. No save-version bump,
+  // matching the events / generation / economy tolerance policy.
+  const origin = isOriginId(p.origin)
+    ? (p.origin as string)
+    : rollOrigin(p.bornAt as number, finalName, p.petType as PetType, p.rarity as Rarity);
+  const household = isHouseholdId(p.household)
+    ? (p.household as string)
+    : rollHousehold(p.bornAt as number, finalName, p.petType as PetType);
+
+  // ── bond / ownerMood / lastTreatedDay: tolerant (§3/§5/§9) ────────────────
+  // Added after v3 shipped — repaired to their seeds rather than invalidating an
+  // otherwise-valid save (same policy as events/generation/economy). Present-but-
+  // out-of-range values are clamped to the valid window, not rejected.
+  const bond = isFiniteInRange(p.bond, 0, 100) ? (p.bond as number) : BOND_SEED;
+  const ownerMood = isFiniteInRange(p.ownerMood, 0, 100) ? (p.ownerMood as number) : OWNER_MOOD_SEED;
+  const lastTreatedDay = isFiniteInRange(p.lastTreatedDay, 0, Number.MAX_SAFE_INTEGER)
+    ? Math.floor(p.lastTreatedDay as number)
+    : null;
+
   // All fields valid — construct the typed return value without an unsafe cast
   return {
     version: p.version as number,
@@ -133,6 +160,11 @@ function validatePetState(parsed: unknown): PetState | null {
     causeOfDeath: p.causeOfDeath as PetState['causeOfDeath'],
     events,
     generation,
+    origin,
+    household,
+    bond,
+    ownerMood,
+    lastTreatedDay,
     economy: validateEconomy(p.economy),
     stats: {
       hunger: s.hunger as number,

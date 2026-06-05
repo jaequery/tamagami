@@ -33,8 +33,10 @@ const RARITY_WEIGHTS: Record<Rarity, number> = {
 };
 
 // ─── Deterministic seed hash (FNV-1a, 32-bit) → unit float in [0, 1) ──────────
-// Small, fast, dependency-free, well-distributed for short string seeds.
-function hashUnit(seed: string): number {
+// Small, fast, dependency-free, well-distributed for short string seeds. Exported
+// so the other deterministic life-story engines (origins.ts, household.ts) roll
+// off the same primitive — one hash, no Math.random anywhere.
+export function hashUnit(seed: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
@@ -122,16 +124,20 @@ export function rollHeirRarity(
 }
 
 // ─── Life-stage thresholds ────────────────────────────────────────────────────
-// Lower bound (in ageSeconds) at which each stage begins. Tunable. EGG hatches
-// at 45s on purpose: the first reveal must land in the opening session or the
-// hook never sets. Later stages stretch into the real retention curve.
+// Lower bound (in ageSeconds) at which each stage begins. EGG hatches at 45s on
+// purpose: the birth reveal (§1) must land in the opening session or the hook
+// never sets. After that the stages are retuned to GAME.md §6's ~4-week cat-life
+// curve (long enough to grieve, short enough to meet the next one). The internal
+// ids map onto the cat stage names in lifespan.ts:
+//   baby = KITTEN · child = ADOLESCENT · teen = ADULT · adult = SENIOR · elder = ELDER
+const DAY = 24 * 60 * 60;
 export const STAGE_THRESHOLDS: { stage: LifeStage; atSeconds: number }[] = [
   { stage: 'egg', atSeconds: 0 },
-  { stage: 'baby', atSeconds: 45 },
-  { stage: 'child', atSeconds: 1 * 60 * 60 },   // 1h
-  { stage: 'teen', atSeconds: 8 * 60 * 60 },    // 8h
-  { stage: 'adult', atSeconds: 24 * 60 * 60 },  // 1d
-  { stage: 'elder', atSeconds: 5 * 24 * 60 * 60 }, // 5d
+  { stage: 'baby', atSeconds: 45 },         // birth → kitten
+  { stage: 'child', atSeconds: 4 * DAY },   // adolescent
+  { stage: 'teen', atSeconds: 9 * DAY },    // adult (her prime)
+  { stage: 'adult', atSeconds: 16 * DAY },  // senior
+  { stage: 'elder', atSeconds: 22 * DAY },  // elder
 ];
 
 export const STAGE_ORDER: readonly LifeStage[] = [

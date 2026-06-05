@@ -1,6 +1,18 @@
 import type { CauseOfDeath, Mood, PetState, PetType } from './types';
 import { isAnimal } from './profiles';
 import { rollRarityWithLuck, rollHeirRarity } from './evolution';
+import { rollOrigin } from './origins';
+import { rollHousehold, startingCoinsForHousehold, parseHouseholdId } from './household';
+import { BOND_SEED, deepenBond, dimBondForAbsence } from './bond';
+import {
+  OWNER_MOOD_SEED,
+  driftOwnerMood,
+  applyOwnerEvent,
+  ownerEventAt,
+  startOwnerStage,
+} from './ownerLife';
+import { ownerStageForGeneration, NATURAL_LIFESPAN_SECONDS } from './lifespan';
+import { treatedDayFor } from './sickness';
 import {
   clockIn as econClockIn,
   clockOut as econClockOut,
@@ -52,10 +64,16 @@ function sanitizeName(raw: string): string {
 
 export function createInitialPet(name: string, petType: PetType, now: number, luck = 0): PetState {
   const cleanName = sanitizeName(name);
+  // All three life-story facts are dealt off the birth identity, not chosen
+  // (GAME.md's surprise-over-choice pillar). Origin is biased by the rarity it's
+  // rolled against; the household sets her starting world via its material tier.
+  const rarity = rollRarityWithLuck(now, cleanName, petType, luck);
+  const origin = rollOrigin(now, cleanName, petType, rarity);
+  const household = rollHousehold(now, cleanName, petType);
   return {
     version: CURRENT_VERSION,
     petType,
-    rarity: rollRarityWithLuck(now, cleanName, petType, luck),
+    rarity,
     name: cleanName,
     bornAt: now,
     lastTick: now,
@@ -70,8 +88,28 @@ export function createInitialPet(name: string, petType: PetType, now: number, lu
     ageSeconds: 0,
     events: [],
     generation: 1,
-    economy: defaultEconomy(),
+    origin,
+    household,
+    bond: BOND_SEED,
+    ownerMood: OWNER_MOOD_SEED,
+    lastTreatedDay: null,
+    economy: { ...defaultEconomy(), coins: startingCoinsForHousehold(household) },
   };
+}
+
+// ─── Owner derivation (the §5 person, on her parallel clock) ────────────────────
+// The owner is the household's person, aged forward across the bloodline (§6). The
+// seed namespaces the owner's event stream to this household so two players' owners
+// live independent lives.
+function ownerSeedFor(pet: PetState): string {
+  return `owner:${pet.bornAt}:${pet.household}`;
+}
+
+/** Her person's current life-stage, given the household + this generation. */
+export function ownerStageOf(pet: PetState): ReturnType<typeof startOwnerStage> {
+  const parsed = parseHouseholdId(pet.household);
+  const start = parsed ? startOwnerStage(parsed.situation) : 'adult';
+  return ownerStageForGeneration(start, pet.generation ?? 1);
 }
 
 /**
@@ -82,10 +120,23 @@ export function createInitialPet(name: string, petType: PetType, now: number, lu
  */
 export function createHeir(parent: PetState, now: number, luck = 0): PetState {
   const base = createInitialPet(parent.name, parent.petType, now, luck);
+  const heirRarity = rollHeirRarity(now, base.name, parent.petType, parent.rarity, luck);
+  // The heir comes to the SAME owner (GAME.md §9: "same owner, aged forward, new
+  // kitten"), so the household carries forward — but it's a new birth, so its
+  // origin is re-rolled fresh against the heir's own (inherited-luck) rarity.
+  const household = parent.household && parent.household.length > 0 ? parent.household : base.household;
   return {
     ...base,
-    rarity: rollHeirRarity(now, base.name, parent.petType, parent.rarity, luck),
+    rarity: heirRarity,
+    origin: rollOrigin(now, base.name, parent.petType, heirRarity),
+    household,
     generation: (parent.generation ?? 1) + 1,
+    // A new kitten is a new relationship → the bond starts fresh. But it comes to
+    // the SAME person, so the owner's mood carries forward (the new kitten often
+    // comes to comfort a grieving owner, §9).
+    bond: BOND_SEED,
+    ownerMood: parent.ownerMood ?? OWNER_MOOD_SEED,
+    lastTreatedDay: null,
     // The heir inherits the family savings — a bequest — but starts its own
     // career and schooling from scratch.
     economy: { ...defaultEconomy(), coins: parent.economy?.coins ?? defaultEconomy().coins },
@@ -110,7 +161,7 @@ export function simulate(state: PetState, now: number): PetState {
   const ageSeconds = state.ageSeconds + elapsed;
 
   return isAnimal(state.petType)
-    ? simulateAnimal(state, now, elapsed, ageSeconds)
+    ? simulateAnimal(state, now, elapsed, ageSeconds, rawElapsed)
     : simulatePlant(state, now, elapsed, ageSeconds);
 }
 
@@ -136,7 +187,13 @@ function simulatePlant(state: PetState, now: number, elapsed: number, ageSeconds
 }
 
 // ── Cat / dog: hunger + happiness drain; health follows; empty health → death ─
-function simulateAnimal(state: PetState, now: number, elapsed: number, ageSeconds: number): PetState {
+function simulateAnimal(
+  state: PetState,
+  now: number,
+  elapsed: number,
+  ageSeconds: number,
+  rawElapsed: number,
+): PetState {
   // Advance the economy first: graduate finished study, bank shift wages, and
   // collect the happiness cost of working (negative) to fold into the mood decay.
   const { economy, happinessDelta } = stepEconomy(state.economy, now);
@@ -160,6 +217,19 @@ function simulateAnimal(state: PetState, now: number, elapsed: number, ageSecond
     isDead = true;
     causeOfDeath = hungerCritical ? 'starvation' : 'neglect';
   }
+  // §9 — the good death: a long life ends gently of old age. This is the natural,
+  // *expected* close (never a fail-state) and takes precedence narratively, but a
+  // neglect/starvation death already in progress keeps its truer cause.
+  if (!isDead && ageSeconds >= NATURAL_LIFESPAN_SECONDS) {
+    isDead = true;
+    causeOfDeath = 'oldAge';
+  }
+
+  // §5 — her person's mood ebbs back toward neutral on the real clock.
+  const ownerMood = driftOwnerMood(state.ownerMood ?? OWNER_MOOD_SEED, elapsed);
+  // §8 — a long absence dims the warmth a little (you missed her life); the reunion
+  // heals the rest. Short ticks dim nothing — neglect costs moments, never the cat.
+  const bond = dimBondForAbsence(state.bond ?? BOND_SEED, rawElapsed);
 
   return {
     ...state,
@@ -168,6 +238,8 @@ function simulateAnimal(state: PetState, now: number, elapsed: number, ageSecond
     isDead,
     causeOfDeath,
     stats: { ...state.stats, hunger, happiness, health },
+    ownerMood,
+    bond,
     economy,
   };
 }
@@ -179,6 +251,7 @@ export function feed(state: PetState, now: number): PetState {
   if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
   return {
     ...simulated,
+    bond: deepenBond(simulated.bond ?? BOND_SEED), // showing up grows the bond (§8)
     stats: {
       ...simulated.stats,
       hunger: clamp(simulated.stats.hunger + FEED_HUNGER_BOOST),
@@ -192,6 +265,7 @@ export function play(state: PetState, now: number): PetState {
   if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
   return {
     ...simulated,
+    bond: deepenBond(simulated.bond ?? BOND_SEED), // the warmth verb deepens the bond (§8)
     stats: {
       ...simulated.stats,
       happiness: clamp(simulated.stats.happiness + PLAY_HAPPINESS_BOOST),
@@ -251,6 +325,38 @@ export function witnessEvent(state: PetState, eventId: string, now: number): Pet
   const simulated = simulate(state, now);
   if (simulated.isDead || simulated.events.includes(eventId)) return simulated;
   return { ...simulated, events: [...simulated.events, eventId] };
+}
+
+/**
+ * Tend today's ailment (§9 — rest / vet / medicine). Recoverable by design: this
+ * just stamps today's local day on `lastTreatedDay`, which clears the worry until
+ * tomorrow (see sickness.activeAilment). A small bond tick — caring is love.
+ */
+export function treat(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  return {
+    ...simulated,
+    lastTreatedDay: treatedDayFor(now),
+    bond: deepenBond(simulated.bond ?? BOND_SEED),
+  };
+}
+
+/**
+ * The reciprocal heart (§5): the cat is there for her person. On a hard day the
+ * comfort softens it; on a bright day she shares the joy — either way the owner's
+ * mood lifts and the bond deepens. Driven by today's owner event so it lands on
+ * the day it's about.
+ */
+export function comfortOwner(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  const event = ownerEventAt(now, ownerSeedFor(simulated), ownerStageOf(simulated));
+  return {
+    ...simulated,
+    ownerMood: applyOwnerEvent(simulated.ownerMood ?? OWNER_MOOD_SEED, event, true),
+    bond: deepenBond(simulated.bond ?? BOND_SEED),
+  };
 }
 
 // ─── Economy reducers (cat / dog) ─────────────────────────────────────────────
