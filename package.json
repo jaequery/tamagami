@@ -10,11 +10,13 @@
     "expo": "~56.0.8",
     "expo-font": "~56.0.5",
     "expo-haptics": "~56.0.3",
+    "expo-linking": "~56.0.13",
     "expo-notifications": "~56.0.15",
     "expo-status-bar": "~56.0.4",
     "expo-updates": "~56.0.17",
     "react": "19.2.3",
-    "react-native": "0.85.3"
+    "react-native": "0.85.3",
+    "react-native-view-shot": "5.1.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

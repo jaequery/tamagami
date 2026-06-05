@@ -9,6 +9,7 @@
 
 import React, { useCallback, useRef } from 'react';
 import { Modal, View, Share, StyleSheet } from 'react-native';
+import { captureRef } from 'react-native-view-shot';
 import * as Haptics from 'expo-haptics';
 import type { CauseOfDeath, PetState } from '../game/types';
 import { paletteForRarity, rarityAccent } from '../game/palettes';
@@ -71,7 +72,7 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
 
   const epitaph = epitaphFor(pet.name, pet.bornAt);
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     const deepLink = `tamagami://hatch?type=${pet.petType}&rarity=${pet.rarity}`;
     const touched = auraEvents.length > 0
@@ -82,6 +83,19 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
         + `Raise your own on TAMAGAMI: ${deepLink}`
       : `${name} the ${form} — ${ageLabel} old and thriving on TAMAGAMI (gen ${pet.generation}).${touched}\n`
         + `Hatch your own mystery pet: ${deepLink}`;
+
+    // Capture the cartridge as a PNG and share image + caption together. iOS's
+    // share sheet attaches the file (`url`) AND the text (with the install link).
+    // If capture isn't available (Expo Go / web / native module missing), fall
+    // back to a text-only share so the button never dead-ends.
+    try {
+      const uri = await captureRef(cardRef, { format: 'png', quality: 1, result: 'tmpfile' });
+      const fileUri = uri.startsWith('file://') ? uri : `file://${uri}`;
+      await Share.share({ url: fileUri, message });
+      return;
+    } catch {
+      // fall through to text-only
+    }
     Share.share({ message }).catch(() => undefined);
   }, [name, form, ageLabel, auraEvents, epitaph, pet.petType, pet.rarity, pet.isDead, pet.generation, pet.causeOfDeath]);
 

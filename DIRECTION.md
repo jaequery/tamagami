@@ -139,16 +139,28 @@ Code map (additive; **no save-version bump** — rarity over BLE and on friends 
 - `RARITY_WEIGHTS`: common 60 / uncommon 25 / rare 10 / epic 4 / **secret 1%** (the
   "show someone" pull).
 
-### Honest gaps (Phase-1.5 follow-ups, flagged not hidden)
+## Viral loop — what's built (closes share → install → reward)
 
-- **Share is text + deep link, not an image yet.** The cartridge renders as a
-  capturable view; add `react-native-view-shot` + `expo-sharing` (one native rebuild)
-  to ship the PNG. That's the real viral upgrade.
-- **iOS widget shows the grown pet, not the egg/rarity.** The Swift mirror
-  (`targets/widget/Sprite.swift`, `Engine.swift`) wasn't extended this pass — additive,
-  so nothing breaks, but the widget won't reflect rarity/egg until mirrored.
+The engines create shareable moments; this arc makes them actually spread. Requires the
+build with the new native dep (`react-native-view-shot`) to function — degrades to a
+text-only share without it.
+
+- **Image share.** `ShareCard.handleShare` captures the cartridge/tombstone view to a PNG
+  (`captureRef`, `react-native-view-shot`) and shares **image + caption together** via RN
+  `Share.share({ url, message })` — iOS attaches the picture AND the text with the install
+  link. Falls back to text-only if capture is unavailable (Expo Go / web).
+- **Deep links.** `App.useGiftLink` parses inbound `tamagami://hatch?type=&rarity=` (via
+  `expo-linking`), and `game/gift.ts` records a one-time **luck gift** scaled by the shared
+  pet's rarity, consumed at the recipient's next hatch (stacks with social charm). New
+  players arrive to a luckier first egg + a "🎁 YOU WERE INVITED" welcome — the reward that
+  closes the loop. (`expo-sharing` was evaluated and dropped: it can't attach the link.)
+
+### Honest gaps (flagged not hidden)
+
+- **iOS widget shows the grown pet, not the egg/rarity/events.** The Swift mirror
+  (`targets/widget/Sprite.swift`, `Engine.swift`) hasn't been extended — additive, so
+  nothing breaks, but the widget won't reflect the new state until mirrored.
 - **Egg-first onboarding not adopted.** You still pick plant/cat/dog; the mystery is the
-  rarity hidden in the egg. Going full egg-first (hidden species) is a deliberate later
-  call — it trades the "I chose a dog" agency for deeper mystery.
-- **Deep-link handler.** `scheme: tamagami` is registered; nothing routes
-  `tamagami://hatch?...` yet (no-op until Phase 2 wires it).
+  rarity hidden in the egg. Full egg-first (hidden species) is a deliberate later call.
+- **Image share needs a build.** `react-native-view-shot` is native — the image path only
+  works in a build that includes it (not the current TestFlight build 10).

@@ -14,6 +14,7 @@ import {
 } from '../game/engine';
 import { appendAncestor, ancestorFrom } from '../game/lineage';
 import { loadCharm } from '../game/social';
+import { consumeGiftLuck } from '../game/gift';
 import { initNotifications, rescheduleCareNotifications } from '../game/notifications';
 import { clearPet, loadPet, savePet } from '../game/storage';
 import { clearWidget, syncWidget } from '../game/widget';
@@ -175,14 +176,15 @@ export function usePet(): UsePet {
     const cur = petRef.current;
     if (cur === null || !cur.isDead) return;
     void appendAncestor(ancestorFrom(cur));
-    // Charm from rare friends gives the heir extra rarity luck.
-    void loadCharm().then((luck) => applyState(createHeir(cur, Date.now(), luck), true));
+    // Charm from rare friends + any pending deep-link gift give the heir luck.
+    void Promise.all([loadCharm(), consumeGiftLuck()]).then(([charm, gift]) =>
+      applyState(createHeir(cur, Date.now(), charm + gift), true));
   }, [applyState]);
 
   const actionSelectType = useCallback((petType: PetType, name?: string) => {
-    // Charm from rare friends gives a fresh pet extra rarity luck at hatch.
-    void loadCharm().then((luck) => {
-      applyState(createInitialPet(name ?? 'Pixel', petType, Date.now(), luck), true);
+    // Charm from rare friends + any pending deep-link gift give a fresh pet luck.
+    void Promise.all([loadCharm(), consumeGiftLuck()]).then(([charm, gift]) => {
+      applyState(createInitialPet(name ?? 'Pixel', petType, Date.now(), charm + gift), true);
     });
   }, [applyState]);
 

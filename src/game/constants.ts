@@ -93,3 +93,9 @@ export const EVENT_CODEX_KEY = '@tama/events/v1';
 // The ordered list of past pets in a bloodline (graves). Permanent and
 // save-independent so the family tree survives reset. See game/lineage.ts.
 export const LINEAGE_KEY = '@tama/lineage/v1';
+
+// ─── Gift (deep-link welcome luck) ────────────────────────────────────────────
+// A pending luck bonus left by a tamagami:// hatch link someone shared. Consumed
+// at the recipient's next hatch — closes the share → install → reward loop.
+export const GIFT_KEY = '@tama/gift/v1';
+export const GIFT_LUCK_CAP = 3;
