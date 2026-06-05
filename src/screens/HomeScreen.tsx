@@ -30,7 +30,8 @@ import {
 } from '../game/evolution';
 import { paletteForRarity, rarityAccent } from '../game/palettes';
 import { loadDiscovered, recordDiscovered } from '../game/codex';
-import { phaseOfDay, phaseLabel } from '../game/world';
+import { phaseOfDay, phaseLabel, isNight } from '../game/world';
+import type { PetActivity } from '../game/animations';
 import { activeEventAt, eventById, type GameEvent } from '../game/events';
 import { loadWitnessed, recordWitnessed } from '../game/eventCodex';
 import { loadLineage, epitaphFor, type Ancestor } from '../game/lineage';
@@ -408,6 +409,42 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const handleOpenCareer = useCallback(() => setCareerOpen(true), []);
   const handleCloseCareer = useCallback(() => setCareerOpen(false), []);
 
+  // ── Interaction → pet activity ──
+  // Bumping `nonce` replays `key` on the sprite once. The nonce lives in a ref so
+  // the render path stays pure (no Date.now()/random) and parity is deterministic.
+  const [activity, setActivity] = useState<{ key: PetActivity; nonce: number } | undefined>(undefined);
+  const activityNonceRef = useRef(0);
+  const triggerActivity = useCallback((key: PetActivity) => {
+    activityNonceRef.current += 1;
+    setActivity({ key, nonce: activityNonceRef.current });
+  }, []);
+
+  // PLAY alternates jump/dance by nonce parity (deterministic, no random).
+  const handlePlay = useCallback(() => {
+    activityNonceRef.current += 1;
+    const nonce = activityNonceRef.current;
+    setActivity({ key: nonce % 2 === 1 ? 'jump' : 'dance', nonce });
+    actions.play();
+  }, [actions]);
+
+  // WATER = the plant drinking, shown with the 'eat' animation.
+  const handleWater = useCallback(() => {
+    triggerActivity('eat');
+    actions.water();
+  }, [actions, triggerActivity]);
+
+  // FEED actually happens in the shop; play 'eat' on a successful buy.
+  const handleBuyFood = useCallback((foodId: string) => {
+    triggerActivity('eat');
+    actions.buyFood(foodId);
+  }, [actions, triggerActivity]);
+
+  // SOCIALIZE: a nearby meet appearing fires a 'cheer'.
+  useEffect(() => {
+    if (meet === null) return;
+    triggerActivity('cheer');
+  }, [meet, triggerActivity]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -483,6 +520,9 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                   stage={stage}
                   palette={stage === 'egg' ? eggPalette : palette}
                   background={showRarityFrame ? palette.bg : LCD_BG}
+                  activity={activity}
+                  ambient={!pet.isDead}
+                  isNight={isNight(clockNow)}
                 />
               </View>
 
@@ -535,12 +575,21 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 {profile.actions.map((key) => {
                   const spec = ACTION_SPECS[key];
                   const isFeed = key === 'feed';
+                  // FEED opens the shop; PLAY/WATER also trigger a pet animation
+                  // before running the underlying action.
+                  const onPress = isFeed
+                    ? handleOpenShop
+                    : key === 'play'
+                      ? handlePlay
+                      : key === 'water'
+                        ? handleWater
+                        : () => spec.run(actions);
                   return (
                     <PixelButton
                       key={key}
                       label={spec.label}
                       glyph={spec.glyph}
-                      onPress={isFeed ? handleOpenShop : () => spec.run(actions)}
+                      onPress={onPress}
                       disabled={pet.isDead}
                       accessibilityLabel={isFeed ? 'Open the food shop to feed your pet' : spec.accessibilityLabel}
                     />
@@ -661,7 +710,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
           <ShopModal
             visible={shopOpen}
             coins={coins}
-            onBuy={actions.buyFood}
+            onBuy={handleBuyFood}
             onClose={handleCloseShop}
           />
           <CareerModal
