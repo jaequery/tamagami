@@ -15,15 +15,20 @@
  *   6 = shell accent (device teal highlight)
  *   7 = tear (COLOR_TEAR = LCD_SHADE2 dark-green, distinct from sick orange)
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Animated, AccessibilityInfo, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Animated, StyleSheet } from 'react-native';
 import type { LifeStage, Mood, PetType } from '../game/types';
 import { paletteForRarity, type LcdPalette } from '../game/palettes';
+import type { PetActivity, OverlayGlyph } from '../game/animations';
+import { usePetAnimation } from './usePetAnimation';
+import { PixelText } from './PixelText';
 import {
   COLOR_WARNING,
   COLOR_TEAR,
   SHELL_LIGHT,
   CELL_SIZE,
+  LCD_DARK,
+  SPACE_2,
 } from '../theme';
 
 type SpriteMatrix = number[][];
@@ -259,6 +264,16 @@ function getSprite(petType: PetType, mood: Mood): SpriteMatrix {
   return byMood.neutral;
 }
 
+// Floating overlay glyphs (driven by usePetAnimation) → a single pixel char.
+// 'none' renders nothing.
+const GLYPH_CHAR: Record<Exclude<OverlayGlyph, 'none'>, string> = {
+  zzz:   'Z',
+  note:  '♪',
+  heart: '♥',
+  crumb: '•',
+  spark: '✦',
+};
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 interface PetSpriteProps {
@@ -268,6 +283,10 @@ interface PetSpriteProps {
   palette?: LcdPalette;   // rarity tint; defaults to common (DMG green)
   background?: string;    // color shown through transparent cells; defaults to palette.bg
   cellSize?: number;      // pt per pixel cell; defaults to the theme CELL_SIZE
+  // ── Motion (all optional; omitting them = the classic gentle idle bob) ──
+  activity?: { key: PetActivity; nonce: number }; // bump nonce ⇒ play once
+  ambient?: boolean;      // enable the self-driven idle scheduler (default false)
+  isNight?: boolean;      // gate night-only ambient activities (default false)
 }
 
 export function PetSprite({
@@ -277,42 +296,26 @@ export function PetSprite({
   palette = COMMON_PALETTE,
   background,
   cellSize = CELL_SIZE,
+  activity,
+  ambient = false,
+  isNight = false,
 }: PetSpriteProps): React.ReactElement {
   const isEgg = stage === 'egg';
   const sprite = isEgg ? SPRITE_EGG : getSprite(petType, mood);
   const bg = background ?? palette.bg;
-  const [translateY] = useState(() => new Animated.Value(0));
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // An egg gently wobbles (it's incubating, not dead); a ghost stays frozen.
   const isDead = mood === 'dead' && !isEgg;
 
-  useEffect(() => {
-    let reducedMotion = false;
-
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => { reducedMotion = enabled; })
-      .catch(() => undefined)
-      .finally(() => {
-        // Dead stays frozen; reduced-motion respected for everything else.
-        if (isDead || reducedMotion) {
-          translateY.setValue(0);
-          return;
-        }
-
-        animRef.current = Animated.loop(
-          Animated.sequence([
-            Animated.timing(translateY, { toValue: -4, duration: 600, useNativeDriver: true }),
-            Animated.timing(translateY, { toValue: 0, duration: 600, useNativeDriver: true }),
-          ]),
-        );
-        animRef.current.start();
-      });
-
-    return () => {
-      animRef.current?.stop();
-    };
-  }, [isDead, translateY]);
+  // All motion (idle bob, one-shot activities, ambient wandering, overlay glyph)
+  // lives in the hook so this component stays a pure renderer.
+  const { animatedStyle, overlayGlyph, overlayStyle } = usePetAnimation({
+    isEgg,
+    isDead,
+    ambient,
+    isNight,
+    activity,
+  });
 
   const accessLabel = isEgg
     ? 'Pet sprite: unhatched egg'
@@ -322,7 +325,7 @@ export function PetSprite({
 
   return (
     <Animated.View
-      style={[styles.container, { transform: [{ translateY }] }]}
+      style={[styles.container, { transform: animatedStyle.transform }]}
       accessible
       accessibilityLabel={accessLabel}
     >
@@ -339,6 +342,21 @@ export function PetSprite({
           ))}
         </View>
       ))}
+
+      {/* Floating glyph above the sprite — absolute so it never shifts layout. */}
+      {overlayGlyph !== 'none' && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.overlay,
+            { opacity: overlayStyle.opacity, transform: overlayStyle.transform },
+          ]}
+        >
+          <PixelText variant="tiny" color={LCD_DARK}>
+            {GLYPH_CHAR[overlayGlyph]}
+          </PixelText>
+        </Animated.View>
+      )}
     </Animated.View>
   );
 }
@@ -349,5 +367,11 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+  },
+  // Floats near the sprite's top-right; absolute so it's out of the layout flow.
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    right: -SPACE_2,
   },
 });

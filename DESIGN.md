@@ -68,12 +68,20 @@ mystery, and `secret` doubles as a night/dark mode.
   actions → share/codex bar → social bar. Modals (friends, codex, share, reveal) overlay.
 
 ## Motion — a reward currency
-- **Daily care stays calm:** the only ambient motion is the sprite's idle bob and the
-  critical-stat blink. Don't add more here.
+- **The pet is alive, not jittery:** a calm breathing idle bob is the baseline. On top
+  of it the pet plays short, low-amplitude **activities** — walk / jump / dance / eat /
+  sleep / cheer — fired two ways: a self-driven idle scheduler picks weighted ambient
+  activities on a randomized timer, and player interaction fires a specific one
+  (feed/buy → eat, play → jump or dance, water → eat, nearby meet → cheer). Sleep is
+  night-only. See `game/animations.ts` (pure rules), `components/usePetAnimation.ts`
+  (the Animated recipes + scheduler), and the floating glyph overlay (Zzz / ♪ / ♥ / •).
+- **Keep activity motion small:** transforms only (translate/scale/rotate) over the
+  pixel grid — never loud enough to compete with a reveal. The sprite matrices are
+  untouched so the Swift widget stays in sync.
 - **Spend big motion only on reveals:** `RevealOverlay` does a white blow-out flash →
   spring-in of the new form. A reveal should feel like an event because it's rare.
 - **Respect reduce-motion:** every animation checks `AccessibilityInfo.isReduceMotionEnabled`
-  and snaps to the end state when on.
+  and snaps to the end state when on. Dead pets freeze; eggs only ever do the gentle bob.
 - **Haptics:** care tap = light; reveal = success notification. (Reserved: death = long
   descending, event = double pulse.)
 
@@ -83,3 +91,4 @@ mystery, and `secret` doubles as a night/dark mode.
 | 2026-06-04 | Added rarity-palette system + egg/evolution + codex + share card | `/design-consultation`: make the app fun/new/mysterious/viral while staying local-only. Rarity reuses authentic Game Boy palettes so mystery sits on top of the soul, not over it. |
 | 2026-06-04 | Egg renders in common palette | Color must not leak the hidden rarity before hatch. |
 | 2026-06-04 | Reveal motion reserved for stage-ups only | Keep daily care calm so reveals land as events. |
+| 2026-06-05 | Added a layered pet-activity system (idle bob + ambient walk/jump/dance/sleep + interaction-fired eat/cheer) | Static sprite felt lifeless; small transform-only activities raise engagement while reveals keep the big motion. Matrices unchanged → widget stays in sync. |
