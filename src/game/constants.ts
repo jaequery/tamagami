@@ -94,6 +94,12 @@ export const EVENT_CODEX_KEY = '@tama/events/v1';
 // the event codex. See game/momentCodex.ts and game/moments.ts.
 export const MOMENT_CODEX_KEY = '@tama/moments/v1';
 
+// The set of pet birth timestamps whose cold-open cinematic (§1–3) has already
+// played — so the birth sequence plays exactly once per pet (and once per heir),
+// and returning users skip straight to their pet. Save-independent. See
+// game/intro.ts and components/ColdOpen.tsx.
+export const INTRO_SEEN_KEY = '@tama/intro/v1';
+
 // ─── Lineage (family tree) ────────────────────────────────────────────────────
 // The ordered list of past pets in a bloodline (graves). Permanent and
 // save-independent so the family tree survives reset. See game/lineage.ts.
