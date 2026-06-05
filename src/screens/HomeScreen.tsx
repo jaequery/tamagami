@@ -593,8 +593,9 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
     void hasSeenIntro(pet.bornAt).then((seen) => {
       if (cancelled) return;
       // Only a brand-new adoption / heir plays it; an established (pre-feature) or
-      // dead pet is silently marked seen so the cinematic never retro-fires.
-      if (!seen && pet.ageSeconds < 120 && !pet.isDead) {
+      // dead pet is silently marked seen so the cinematic never retro-fires. The
+      // birth story is cat-first (cat/dog) — a plant skips it (its copy is feline).
+      if (!seen && animal && pet.ageSeconds < 120 && !pet.isDead) {
         setIntroState('play');
       } else {
         setIntroState('done');
