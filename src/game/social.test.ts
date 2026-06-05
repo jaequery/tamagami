@@ -59,14 +59,14 @@ describe('rollRarityWithLuck', () => {
   it('is monotonic in luck (more luck never lowers rarity)', () => {
     for (let i = 0; i < 200; i++) {
       const born = 1_700_000_000_000 + i * 1000;
-      const r0 = rarityRank(rollRarityWithLuck(born, `p${i}`, 'dog', 0));
-      const r3 = rarityRank(rollRarityWithLuck(born, `p${i}`, 'dog', 3));
+      const r0 = rarityRank(rollRarityWithLuck(born, `p${i}`, 'cat', 0));
+      const r3 = rarityRank(rollRarityWithLuck(born, `p${i}`, 'cat', 3));
       expect(r3).toBeGreaterThanOrEqual(r0);
     }
   });
 
   it('is deterministic', () => {
-    expect(rollRarityWithLuck(123, 'Pixel', 'plant', 3)).toBe(rollRarityWithLuck(123, 'Pixel', 'plant', 3));
+    expect(rollRarityWithLuck(123, 'Pixel', 'cat', 3)).toBe(rollRarityWithLuck(123, 'Pixel', 'cat', 3));
   });
 
   it('lifts the average rarity over many pets', () => {

@@ -1,13 +1,13 @@
 import { decodePayload, encodePayload } from './nearby';
-import type { PeerIdentity, PetType, Rarity } from './types';
+import type { PeerIdentity, Rarity } from './types';
 
 // Same separator the codec uses (U+001F), built without a literal control char.
 const SEP = String.fromCharCode(0x1f);
 const pack = (...parts: string[]): string => parts.join(SEP);
 
 describe('nearby payload codec', () => {
-  it.each<PetType>(['plant', 'cat', 'dog'])('round-trips a %s identity', (petType) => {
-    const id: PeerIdentity = { id: 'a1b2c3d4', name: 'Rex', petType, rarity: 'common' };
+  it('round-trips a cat identity', () => {
+    const id: PeerIdentity = { id: 'a1b2c3d4', name: 'Rex', petType: 'cat', rarity: 'common' };
     const decoded = decodePayload(encodePayload(id));
     expect(decoded).toEqual(id);
   });
@@ -21,7 +21,7 @@ describe('nearby payload codec', () => {
   );
 
   it('truncates long names to fit the advertisement', () => {
-    const id: PeerIdentity = { id: 'deadbeef', name: 'Bartholomew', petType: 'dog', rarity: 'rare' };
+    const id: PeerIdentity = { id: 'deadbeef', name: 'Bartholomew', petType: 'cat', rarity: 'rare' };
     const decoded = decodePayload(encodePayload(id));
     expect(decoded?.name).toBe('Bartholome'); // 'Bartholomew' → 10 chars
     expect(decoded?.name.length).toBe(10);
@@ -42,8 +42,12 @@ describe('nearby payload codec', () => {
     expect(decodePayload('hello world')).toBeNull();
     expect(decodePayload(pack('XY', 'id', 'c', 'o', 'Rex'))).toBeNull(); // wrong prefix
     expect(decodePayload(pack('TG', '', 'c', 'o', 'Rex'))).toBeNull();   // empty id
-    expect(decodePayload(pack('TG', 'id', 'z', 'o', 'Rex'))).toBeNull(); // unknown type code
     expect(decodePayload(pack('TG', 'id'))).toBeNull();                  // too few parts
+  });
+
+  it('decodes any (legacy plant/dog) type code as a cat — the world is cat-only', () => {
+    const decoded = decodePayload(pack('TG', 'a1b2c3d4', 'd', 'o', 'Rex')); // old 'd' = dog
+    expect(decoded?.petType).toBe('cat');
   });
 
   it('falls back to a default name when the name field is empty', () => {

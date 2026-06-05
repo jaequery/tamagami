@@ -85,12 +85,6 @@ describe('buyFood', () => {
     expect(pet.stats.hunger).toBe(100);
   });
 
-  it('is a no-op on a plant (free care, no economy)', () => {
-    const plant = createInitialPet('Sprout', 'plant', NOW);
-    const after = buyFood(plant, 'meal', NOW);
-    // buyFood does nothing to a plant — its balance is untouched, whatever it seeded.
-    expect(after.economy.coins).toBe(plant.economy.coins);
-  });
 });
 
 // ─── jobs ───────────────────────────────────────────────────────────────────────

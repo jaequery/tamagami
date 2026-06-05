@@ -101,7 +101,6 @@ function formatClock(seconds: number): string {
 function causeOfDeathLabel(cause: CauseOfDeath): string {
   switch (cause) {
     case 'starvation': return 'STARVATION';
-    case 'thirst':     return 'THIRST';
     case 'neglect':    return 'NEGLECT';
     case 'oldAge':     return 'OLD AGE';
     case 'illness':    return 'ILLNESS';
@@ -119,9 +118,8 @@ interface ActionButtonSpec {
 }
 
 const ACTION_SPECS: Record<ActionKey, ActionButtonSpec> = {
-  feed:  { label: 'FEED',  glyph: '*', accessibilityLabel: 'Feed your pet',   run: (a) => a.feed() },
-  play:  { label: 'PLAY',  glyph: '>', accessibilityLabel: 'Play with your pet', run: (a) => a.play() },
-  water: { label: 'WATER', glyph: '~', accessibilityLabel: 'Water your plant', run: (a) => a.water() },
+  feed:  { label: 'FEED', glyph: '*', accessibilityLabel: 'Feed your cat',     run: (a) => a.feed() },
+  play:  { label: 'PLAY', glyph: '>', accessibilityLabel: 'Play with your cat', run: (a) => a.play() },
 };
 
 // ─── Critical Attention Indicator ────────────────────────────────────────────
@@ -549,12 +547,6 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
     actions.play();
   }, [actions]);
 
-  // WATER = the plant drinking, shown with the 'eat' animation.
-  const handleWater = useCallback(() => {
-    triggerActivity('eat');
-    actions.water();
-  }, [actions, triggerActivity]);
-
   // FEED actually happens in the shop; play 'eat' on a successful buy.
   const handleBuyFood = useCallback((foodId: string) => {
     triggerActivity('eat');
@@ -776,15 +768,13 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 {profile.actions.map((key) => {
                   const spec = ACTION_SPECS[key];
                   const isFeed = key === 'feed';
-                  // FEED opens the shop; PLAY/WATER also trigger a pet animation
-                  // before running the underlying action.
+                  // FEED opens the shop; PLAY triggers a pet animation before the
+                  // underlying action.
                   const onPress = isFeed
                     ? handleOpenShop
                     : key === 'play'
                       ? handlePlay
-                      : key === 'water'
-                        ? handleWater
-                        : () => spec.run(actions);
+                      : () => spec.run(actions);
                   return (
                     <PixelButton
                       key={key}
@@ -792,7 +782,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                       glyph={spec.glyph}
                       onPress={onPress}
                       disabled={pet.isDead}
-                      accessibilityLabel={isFeed ? 'Open the food shop to feed your pet' : spec.accessibilityLabel}
+                      accessibilityLabel={isFeed ? 'Open the food shop to feed your cat' : spec.accessibilityLabel}
                     />
                   );
                 })}

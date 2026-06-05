@@ -39,13 +39,14 @@ function formatAge(seconds: number): string {
 function causeLabel(cause: CauseOfDeath): string {
   switch (cause) {
     case 'starvation': return 'STARVED';
-    case 'thirst':     return 'WILTED';
     case 'neglect':    return 'NEGLECT';
+    case 'oldAge':     return 'OLD AGE';
+    case 'illness':    return 'ILLNESS';
     default:           return 'LOST';
   }
 }
 
-const TYPE_NOUN: Record<PetState['petType'], string> = { plant: 'PLANT', cat: 'CAT', dog: 'DOG' };
+const TYPE_NOUN: Record<PetState['petType'], string> = { cat: 'CAT' };
 
 export function LineageModal({ visible, lineage, current, onClose }: LineageModalProps): React.ReactElement {
   const generations = lineage.length + 1;

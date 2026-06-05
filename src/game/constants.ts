@@ -16,12 +16,7 @@ export const HUNGER_DECAY_PER_SECOND = 100 / (4 * 60 * 60);
 // happiness: 100 → 0 over ~5 hours   (18000s)  →  0.005556/s
 export const HAPPINESS_DECAY_PER_SECOND = 100 / (5 * 60 * 60);
 
-// ─── Plant decay rate ────────────────────────────────────────────────────────
-// water:     100 → 0 over ~24 hours  (86400s)  →  0.001157/s
-// Deliberately slow — the plant is the low-maintenance, "easy" pet.
-export const WATER_DECAY_PER_SECOND = 100 / (24 * 60 * 60);
-
-// ─── Health (cat / dog) ──────────────────────────────────────────────────────
+// ─── Health (cat) ────────────────────────────────────────────────────────────
 // Health drains while a core need is critically low, regenerates when both are met.
 export const HUNGER_CRITICAL_THRESHOLD = 15;
 export const HAPPINESS_CRITICAL_THRESHOLD = 15;
@@ -31,34 +26,28 @@ export const HEALTH_DECAY_CRITICAL_PER_SECOND = 100 / (8 * 60 * 60);
 export const HEALTH_REGEN_PER_SECOND = 100 / (4 * 60 * 60);
 
 // ─── Death ───────────────────────────────────────────────────────────────────
-// cat/dog: health → 0 → dead. cause = 'starvation' if hunger was critical, else 'neglect'.
-// plant:   water  → 0 → dead. cause = 'thirst'.
+// health → 0 → dead. cause = 'starvation' if hunger was critical, else 'neglect'.
+// (Old age + illness are the other, gentler causes — see lifespan.ts / sickness.ts.)
 
 // ─── Action effects ──────────────────────────────────────────────────────────
-// FEED (cat/dog)
+// FEED
 export const FEED_HUNGER_BOOST = 30;      // +30 hunger per feed
 export const FEED_HAPPINESS_DELTA = 5;    // small happiness boost from a meal
 
-// PLAY (cat/dog)
+// PLAY (cat)
 export const PLAY_HAPPINESS_BOOST = 25;   // +25 happiness per play session
 export const PLAY_HUNGER_COST = 8;        // −8 hunger (playing makes them hungry)
-
-// WATER (plant)
-export const WATER_BOOST = 35;            // +35 water per watering
 
 // ─── Notification thresholds ─────────────────────────────────────────────────
 // Stat value at/below which the user should be nudged
 export const NOTIFY_HUNGER_THRESHOLD = 20;
 export const NOTIFY_HAPPINESS_THRESHOLD = 20;
-export const NOTIFY_WATER_THRESHOLD = 25;
 
 // ─── Nearby / social ─────────────────────────────────────────────────────────
-// When two TAMAGAMI pets meet over BLE, the local pet gets a one-off "social"
-// boost. Effects mirror the care model: animals cheer up (+happiness, a little
-// +health); a plant gets a small +water (a friend tends it).
-export const SOCIAL_HAPPINESS_BOOST = 20; // cat/dog
-export const SOCIAL_HEALTH_BOOST = 5;     // cat/dog
-export const SOCIAL_WATER_BOOST = 15;     // plant
+// When two TAMAGAMI cats meet over BLE, the local cat gets a one-off "social"
+// boost: +happiness and a little +health.
+export const SOCIAL_HAPPINESS_BOOST = 20;
+export const SOCIAL_HEALTH_BOOST = 5;
 
 // A given peer can only boost this pet once per cooldown window — stops two
 // phones sitting on a desk together from pinning every stat to 100.
@@ -112,11 +101,10 @@ export const GIFT_KEY = '@tama/gift/v1';
 export const GIFT_LUCK_CAP = 3;
 
 // ─── Economy (currency · marketplace · jobs · education) ──────────────────────
-// The animal (cat/dog) care loop now has money behind it: feeding means buying
-// food, food costs coins, coins come from working a job, and better-paying jobs
-// require education you pay for. The plant stays free/zen (water only) — its
-// economy is never surfaced. The economy lives inside PetState.economy and is
-// migrated tolerantly (old v3 saves seed a default), like `events`/`generation`.
+// The care loop has money behind it: feeding means buying food, food costs coins,
+// coins come from working a job, and better-paying jobs require education you pay
+// for. The economy lives inside PetState.economy and is migrated tolerantly (old
+// v3 saves seed a default), like `events`/`generation`.
 
 // Seed coins so a fresh pet can buy a meal or two before its first paycheck —
 // avoids a dead-end where you can't afford food and have no income yet.

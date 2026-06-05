@@ -1,11 +1,14 @@
 // ─── Pet type ───────────────────────────────────────────────────────────────
-// The three care archetypes. Plant is the simplified one (water only);
-// cat and dog share the richer feed + play loop.
-export type PetType = 'plant' | 'cat' | 'dog';
+// Cat-first, and now cat-only: the whole game is one cat's life on your real
+// clock (GAME.md's north star). Plant and dog were removed. Kept as a single-
+// member union so the codec / payload / codex plumbing stays generic and a second
+// species could return later without reshaping everything.
+export type PetType = 'cat';
 
 // 'oldAge' is the gentle, expected close to a long life (§9 — never a fail-state);
-// 'illness' is the rare grave end of an untreated serious sickness.
-export type CauseOfDeath = 'starvation' | 'thirst' | 'neglect' | 'oldAge' | 'illness' | null;
+// 'illness' the rare grave end of an untreated sickness; 'starvation'/'neglect'
+// the (rare, softened) care-failure deaths.
+export type CauseOfDeath = 'starvation' | 'neglect' | 'oldAge' | 'illness' | null;
 export type Mood = 'happy' | 'neutral' | 'sad' | 'dead';
 
 // ─── Rarity ───────────────────────────────────────────────────────────────────
@@ -21,17 +24,16 @@ export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'secret';
 export type LifeStage = 'egg' | 'baby' | 'child' | 'teen' | 'adult' | 'elder';
 
 /**
- * All numeric care stats. Each pet type only *uses* a subset (see PET_PROFILES):
- *  - plant  → water
- *  - cat/dog → hunger, happiness, health
- * Unused stats are held at full and never decay, so they can never affect a type
- * they don't belong to.
+ * The cat's care stats: hunger + happiness drive health, and health is vitality.
+ * `water` is vestigial — the old plant stat, retained in the shape so existing
+ * saves and the iOS widget's decoder don't need a migration. It's held at full,
+ * never decays, and is never surfaced.
  */
 export interface PetStats {
-  hunger: number;    // 0..100  (cat/dog) — 100 = full, 0 = starving
-  happiness: number; // 0..100  (cat/dog)
-  health: number;    // 0..100  (cat/dog) — derived vitality; 0 = death
-  water: number;     // 0..100  (plant)   — the single plant care stat; 0 = death
+  hunger: number;    // 0..100 — 100 = full, 0 = starving
+  happiness: number; // 0..100
+  health: number;    // 0..100 — derived vitality; 0 = death
+  water: number;     // vestigial (was the plant stat); always 100, never used
 }
 
 /**
@@ -71,10 +73,9 @@ export interface PetState {
 }
 
 export interface PetActions {
-  feed(): void;                                      // cat/dog
-  play(): void;                                      // cat/dog
-  water(): void;                                     // plant
-  socialize(): void;                                 // any — boost from meeting a nearby pet
+  feed(): void;
+  play(): void;
+  socialize(): void;                                 // boost from meeting a nearby pet
   witnessEvent(eventId: string): void;               // any — record a live world event onto the pet
   treat(): void;                                     // §9 — tend an ailment (rest/vet/medicine); clears today's worry
   comfortOwner(): void;                              // §5 — the cat is there for her person (deepens bond, lifts mood)

@@ -10,7 +10,6 @@ import {
   simulate,
   socialize,
   treat,
-  water,
 } from './engine';
 import { NATURAL_LIFESPAN_SECONDS } from './lifespan';
 import { bondLevel } from './bond';
@@ -38,13 +37,12 @@ function advanceSeconds(state: PetState, seconds: number): PetState {
 // ─── createInitialPet ────────────────────────────────────────────────────────
 
 describe('createInitialPet', () => {
-  it.each<PetType>(['plant', 'cat', 'dog'])('creates a healthy %s with no death', (petType) => {
-    const pet = createInitialPet('Pixel', petType, NOW);
-    expect(pet.petType).toBe(petType);
+  it('creates a healthy cat with no death', () => {
+    const pet = createInitialPet('Pixel', 'cat', NOW);
+    expect(pet.petType).toBe('cat');
     expect(pet.isDead).toBe(false);
     expect(pet.causeOfDeath).toBeNull();
     expect(pet.stats.health).toBe(100);
-    expect(pet.stats.water).toBe(100);
     expect(pet.name).toBe('Pixel');
     expect(pet.ageSeconds).toBe(0);
   });
@@ -159,8 +157,8 @@ describe('name sanitization', () => {
   });
 
   it('falls back to Pixel for empty / whitespace-only name', () => {
-    expect(createInitialPet('', 'dog', NOW).name).toBe('Pixel');
-    expect(createInitialPet('   ', 'dog', NOW).name).toBe('Pixel');
+    expect(createInitialPet('', 'cat', NOW).name).toBe('Pixel');
+    expect(createInitialPet('   ', 'cat', NOW).name).toBe('Pixel');
   });
 
   it('rename sanitizes the new name', () => {
@@ -173,75 +171,30 @@ describe('name sanitization', () => {
   });
 });
 
-// ─── Plant: water-only model ──────────────────────────────────────────────────
+// ─── Cat: feed + play model ───────────────────────────────────────────────────
 
-describe('plant', () => {
-  it('drains water over time and nothing else', () => {
-    const pet = freshPet('plant');
-    const advanced = advanceSeconds(pet, 3600); // 1 hour
-    expect(advanced.stats.water).toBeLessThan(pet.stats.water);
-    expect(advanced.stats.water).toBeGreaterThan(0);
-    // Animal stats are inert for a plant
-    expect(advanced.stats.hunger).toBe(pet.stats.hunger);
-    expect(advanced.stats.happiness).toBe(pet.stats.happiness);
-  });
-
-  it('water() refills water and clamps at 100', () => {
-    const thirsty = freshPet('plant', {
-      stats: { hunger: 80, happiness: 80, health: 100, water: 20 },
-    });
-    const watered = water(thirsty, NOW);
-    expect(watered.stats.water).toBeGreaterThan(20);
-
-    const full = freshPet('plant', {
-      stats: { hunger: 80, happiness: 80, health: 100, water: 95 },
-    });
-    expect(water(full, NOW).stats.water).toBeLessThanOrEqual(100);
-  });
-
-  it('dies of thirst when water hits 0', () => {
-    const pet = freshPet('plant');
-    const advanced = simulate(pet, pet.lastTick + MAX_CATCHUP_SECONDS * 1000);
-    expect(advanced.stats.water).toBe(0);
-    expect(advanced.isDead).toBe(true);
-    expect(advanced.causeOfDeath).toBe('thirst');
-  });
-
-  it('ignores feed() and play()', () => {
-    const pet = freshPet('plant', {
-      stats: { hunger: 40, happiness: 40, health: 100, water: 80 },
-    });
-    expect(feed(pet, NOW).stats.hunger).toBe(40);
-    expect(play(pet, NOW).stats.happiness).toBe(40);
-  });
-});
-
-// ─── Cat / dog: feed + play model ─────────────────────────────────────────────
-
-describe.each<PetType>(['cat', 'dog'])('%s', (petType) => {
+describe('cat', () => {
   it('drains hunger and happiness over time', () => {
-    const pet = freshPet(petType);
+    const pet = freshPet('cat');
     const advanced = advanceSeconds(pet, 3600);
     expect(advanced.stats.hunger).toBeLessThan(pet.stats.hunger);
     expect(advanced.stats.happiness).toBeLessThan(pet.stats.happiness);
-    // Water is inert for an animal
-    expect(advanced.stats.water).toBe(pet.stats.water);
   });
 
   it('feed() increases hunger, clamped at 100', () => {
-    const pet = freshPet(petType, {
+    const pet = freshPet('cat', {
       stats: { hunger: 40, happiness: 60, health: 100, water: 100 },
     });
     expect(feed(pet, NOW).stats.hunger).toBeGreaterThan(40);
 
-    const full = freshPet(petType, {
+    const full = freshPet('cat', {
       stats: { hunger: 95, happiness: 60, health: 100, water: 100 },
     });
     expect(feed(full, NOW).stats.hunger).toBeLessThanOrEqual(100);
   });
 
   it('play() increases happiness and costs hunger', () => {
-    const pet = freshPet(petType, {
+    const pet = freshPet('cat', {
       stats: { hunger: 60, happiness: 40, health: 100, water: 100 },
     });
     const next = play(pet, NOW);
@@ -249,22 +202,15 @@ describe.each<PetType>(['cat', 'dog'])('%s', (petType) => {
     expect(next.stats.hunger).toBeLessThan(60);
   });
 
-  it('water() is a no-op', () => {
-    const pet = freshPet(petType, {
-      stats: { hunger: 60, happiness: 60, health: 100, water: 50 },
-    });
-    expect(water(pet, NOW).stats.water).toBe(50);
-  });
-
   it('health regenerates when needs are met', () => {
-    const pet = freshPet(petType, {
+    const pet = freshPet('cat', {
       stats: { hunger: 80, happiness: 80, health: 50, water: 100 },
     });
     expect(advanceSeconds(pet, 600).stats.health).toBeGreaterThan(50);
   });
 
   it('health decays toward death when starving', () => {
-    const pet = freshPet(petType, {
+    const pet = freshPet('cat', {
       stats: { hunger: 0, happiness: 60, health: 2, water: 100 },
     });
     const advanced = advanceSeconds(pet, 3600);
@@ -273,7 +219,7 @@ describe.each<PetType>(['cat', 'dog'])('%s', (petType) => {
   });
 
   it('death cause is neglect when happiness — not hunger — bottomed out', () => {
-    const pet = freshPet(petType, {
+    const pet = freshPet('cat', {
       stats: { hunger: 60, happiness: 0, health: 2, water: 100 },
     });
     const advanced = advanceSeconds(pet, 3600);
@@ -282,7 +228,7 @@ describe.each<PetType>(['cat', 'dog'])('%s', (petType) => {
   });
 
   it('feed / play do nothing when dead', () => {
-    const dead = freshPet(petType, {
+    const dead = freshPet('cat', {
       isDead: true,
       stats: { hunger: 0, happiness: 0, health: 0, water: 100 },
     });
@@ -339,23 +285,17 @@ describe('getMood', () => {
     expect(getMood(freshPet('cat', { isDead: true }))).toBe('dead');
   });
 
-  it('plant mood follows water level', () => {
-    expect(getMood(freshPet('plant', { stats: { hunger: 80, happiness: 80, health: 100, water: 90 } }))).toBe('happy');
-    expect(getMood(freshPet('plant', { stats: { hunger: 80, happiness: 80, health: 100, water: 45 } }))).toBe('neutral');
-    expect(getMood(freshPet('plant', { stats: { hunger: 80, happiness: 80, health: 100, water: 10 } }))).toBe('sad');
-  });
-
-  it('animal mood follows hunger + happiness average', () => {
-    expect(getMood(freshPet('dog', { stats: { hunger: 90, happiness: 90, health: 100, water: 100 } }))).toBe('happy');
-    expect(getMood(freshPet('dog', { stats: { hunger: 50, happiness: 50, health: 100, water: 100 } }))).toBe('neutral');
-    expect(getMood(freshPet('dog', { stats: { hunger: 10, happiness: 10, health: 100, water: 100 } }))).toBe('sad');
+  it('mood follows the hunger + happiness average', () => {
+    expect(getMood(freshPet('cat', { stats: { hunger: 90, happiness: 90, health: 100, water: 100 } }))).toBe('happy');
+    expect(getMood(freshPet('cat', { stats: { hunger: 50, happiness: 50, health: 100, water: 100 } }))).toBe('neutral');
+    expect(getMood(freshPet('cat', { stats: { hunger: 10, happiness: 10, health: 100, water: 100 } }))).toBe('sad');
   });
 });
 
 // ─── restart / selectType-style respawn ───────────────────────────────────────
 
 describe('restart', () => {
-  it('yields a fresh, healthy pet of the same type by default', () => {
+  it('yields a fresh, healthy cat by default', () => {
     const dead = freshPet('cat', { isDead: true, causeOfDeath: 'neglect' });
     const next = restart(dead, NOW);
     expect(next.petType).toBe('cat');
@@ -364,13 +304,8 @@ describe('restart', () => {
     expect(next.stats.health).toBe(100);
   });
 
-  it('can switch pet type', () => {
-    const dead = freshPet('cat', { isDead: true });
-    expect(restart(dead, NOW, 'plant').petType).toBe('plant');
-  });
-
   it('keeps the existing name when none is given', () => {
-    const dead = freshPet('dog', { isDead: true, name: 'OldPet' });
+    const dead = freshPet('cat', { isDead: true, name: 'OldPet' });
     expect(restart(dead, NOW).name).toBe('OldPet');
   });
 });
@@ -378,8 +313,8 @@ describe('restart', () => {
 // ─── socialize (nearby meet boost) ────────────────────────────────────────────
 
 describe('socialize', () => {
-  it.each<PetType>(['cat', 'dog'])('boosts %s happiness and health, clamped', (petType) => {
-    const pet = freshPet(petType, {
+  it('boosts happiness and health, clamped', () => {
+    const pet = freshPet('cat', {
       stats: { hunger: 60, happiness: 40, health: 50, water: 100 },
     });
     const next = socialize(pet, NOW);
@@ -387,18 +322,6 @@ describe('socialize', () => {
     expect(next.stats.health).toBeGreaterThan(50);
     expect(next.stats.happiness).toBeLessThanOrEqual(100);
     expect(next.stats.health).toBeLessThanOrEqual(100);
-  });
-
-  it('boosts plant water, clamped at 100', () => {
-    const pet = freshPet('plant', {
-      stats: { hunger: 80, happiness: 80, health: 100, water: 40 },
-    });
-    expect(socialize(pet, NOW).stats.water).toBeGreaterThan(40);
-
-    const full = freshPet('plant', {
-      stats: { hunger: 80, happiness: 80, health: 100, water: 95 },
-    });
-    expect(socialize(full, NOW).stats.water).toBeLessThanOrEqual(100);
   });
 
   it('does nothing when dead', () => {

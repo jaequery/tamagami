@@ -28,7 +28,7 @@ import {
   SPACE_8,
 } from '../theme';
 
-const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
+const PET_TYPES: readonly PetType[] = ['cat'];
 const CELL_PX = 3; // sprite cell size inside a codex thumbnail (14 cells → 42pt)
 const NIGHT = paletteForRarity('secret'); // cosmic theme for witnessed events
 

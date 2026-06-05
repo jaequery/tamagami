@@ -21,8 +21,8 @@ export interface Ancestor {
   causeOfDeath: CauseOfDeath;
 }
 
-const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
-const CAUSES: readonly (CauseOfDeath)[] = [null, 'starvation', 'thirst', 'neglect', 'oldAge', 'illness'];
+const PET_TYPES: readonly PetType[] = ['cat'];
+const CAUSES: readonly (CauseOfDeath)[] = [null, 'starvation', 'neglect', 'oldAge', 'illness'];
 
 function isAncestor(v: unknown): v is Ancestor {
   if (typeof v !== 'object' || v === null) return false;

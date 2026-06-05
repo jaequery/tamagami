@@ -38,14 +38,10 @@ import {
   MAX_CATCHUP_SECONDS,
   NOTIFY_HAPPINESS_THRESHOLD,
   NOTIFY_HUNGER_THRESHOLD,
-  NOTIFY_WATER_THRESHOLD,
   PLAY_HAPPINESS_BOOST,
   PLAY_HUNGER_COST,
   SOCIAL_HAPPINESS_BOOST,
   SOCIAL_HEALTH_BOOST,
-  SOCIAL_WATER_BOOST,
-  WATER_BOOST,
-  WATER_DECAY_PER_SECOND,
 } from './constants';
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
@@ -186,33 +182,10 @@ export function simulate(state: PetState, now: number): PetState {
 
   const ageSeconds = state.ageSeconds + elapsed;
 
-  return isAnimal(state.petType)
-    ? simulateAnimal(state, now, elapsed, ageSeconds, rawElapsed)
-    : simulatePlant(state, now, elapsed, ageSeconds);
+  return simulateAnimal(state, now, elapsed, ageSeconds, rawElapsed);
 }
 
-// ── Plant: a single water stat that drains slowly; empty → wilted (thirst) ────
-function simulatePlant(state: PetState, now: number, elapsed: number, ageSeconds: number): PetState {
-  const water = clamp(state.stats.water - WATER_DECAY_PER_SECOND * elapsed);
-
-  let isDead = false;
-  let causeOfDeath: CauseOfDeath = null;
-  if (water === 0) {
-    isDead = true;
-    causeOfDeath = 'thirst';
-  }
-
-  return {
-    ...state,
-    lastTick: now,
-    ageSeconds,
-    isDead,
-    causeOfDeath,
-    stats: { ...state.stats, water },
-  };
-}
-
-// ── Cat / dog: hunger + happiness drain; health follows; empty health → death ─
+// ── Cat: hunger + happiness drain; health follows; empty health → death ───────
 function simulateAnimal(
   state: PetState,
   now: number,
@@ -300,44 +273,20 @@ export function play(state: PetState, now: number): PetState {
   };
 }
 
-export function water(state: PetState, now: number): PetState {
-  const simulated = simulate(state, now);
-  if (simulated.isDead || simulated.petType !== 'plant') return simulated;
-  return {
-    ...simulated,
-    stats: {
-      ...simulated.stats,
-      water: clamp(simulated.stats.water + WATER_BOOST),
-    },
-  };
-}
-
 /**
- * Social boost from meeting another TAMAGAMI pet nearby. Animals cheer up
- * (+happiness, a little +health); a plant gets a small +water. Cooldown gating
- * lives in the friends layer — this reducer just applies the effect.
+ * Social boost from meeting another TAMAGAMI cat nearby (+happiness, a little
+ * +health). Cooldown gating lives in the friends layer — this reducer just
+ * applies the effect.
  */
 export function socialize(state: PetState, now: number): PetState {
   const simulated = simulate(state, now);
   if (simulated.isDead) return simulated;
-
-  if (isAnimal(simulated.petType)) {
-    return {
-      ...simulated,
-      stats: {
-        ...simulated.stats,
-        happiness: clamp(simulated.stats.happiness + SOCIAL_HAPPINESS_BOOST),
-        health: clamp(simulated.stats.health + SOCIAL_HEALTH_BOOST),
-      },
-    };
-  }
-
-  // plant
   return {
     ...simulated,
     stats: {
       ...simulated.stats,
-      water: clamp(simulated.stats.water + SOCIAL_WATER_BOOST),
+      happiness: clamp(simulated.stats.happiness + SOCIAL_HAPPINESS_BOOST),
+      health: clamp(simulated.stats.health + SOCIAL_HEALTH_BOOST),
     },
   };
 }
@@ -456,9 +405,7 @@ export function rename(state: PetState, name: string): PetState {
 export function getMood(state: PetState): Mood {
   if (state.isDead) return 'dead';
 
-  const level = state.petType === 'plant'
-    ? state.stats.water
-    : (state.stats.hunger + state.stats.happiness) / 2;
+  const level = (state.stats.hunger + state.stats.happiness) / 2;
 
   if (level >= 60) return 'happy';
   if (level >= 30) return 'neutral';
@@ -490,8 +437,7 @@ export interface NotificationProjection {
 }
 
 /**
- * Projects when each *relevant* stat will need attention based on current state.
- * Plant projects water; cat/dog project hunger + happiness.
+ * Projects when each care stat (hunger + happiness) will next need attention.
  * Used by notifications.ts to schedule local push notifications.
  */
 export function nextStageAt(state: PetState): NotificationProjection[] {
@@ -499,14 +445,6 @@ export function nextStageAt(state: PetState): NotificationProjection[] {
 
   const now = state.lastTick;
   const projections: NotificationProjection[] = [];
-
-  if (state.petType === 'plant') {
-    const waterCross = projectCrossTime(state.stats.water, NOTIFY_WATER_THRESHOLD, WATER_DECAY_PER_SECOND, now);
-    if (waterCross !== null) {
-      projections.push({ stat: 'water', label: `${state.name} is thirsty! 💧`, triggerAtMs: waterCross });
-    }
-    return projections;
-  }
 
   const hungerCross = projectCrossTime(state.stats.hunger, NOTIFY_HUNGER_THRESHOLD, HUNGER_DECAY_PER_SECOND, now);
   if (hungerCross !== null) {

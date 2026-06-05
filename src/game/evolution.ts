@@ -184,7 +184,7 @@ const RARITY_EPITHET: Record<Rarity, string> = {
   secret: 'LUNAR',
 };
 
-const TYPE_NOUN: Record<PetType, string> = { plant: 'PLANT', cat: 'CAT', dog: 'DOG' };
+const TYPE_NOUN: Record<PetType, string> = { cat: 'CAT' };
 
 export function rarityEpithet(rarity: Rarity): string {
   return RARITY_EPITHET[rarity];
@@ -206,7 +206,7 @@ export interface FormEntry {
   name: string;
 }
 
-const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
+const PET_TYPES: readonly PetType[] = ['cat'];
 
 /** Every collectible form, ordered type-major then by rarity. Drives the codex grid. */
 export const ALL_FORMS: readonly FormEntry[] = PET_TYPES.flatMap((petType) =>
