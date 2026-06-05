@@ -14,7 +14,7 @@ import { usePet } from './src/hooks/usePet';
 import { RARITIES, rarityEpithet } from './src/game/evolution';
 import { giftLuckFromRarity, setPendingGiftLuck } from './src/game/gift';
 import type { PetType, Rarity } from './src/game/types';
-import { LCD_SHADE2, SHELL_DARK, SPACE_6, SPACE_8 } from './src/theme';
+import { LCD_BG, LCD_SHADE2 } from './src/theme';
 
 /**
  * Handle inbound share links: tamagami://hatch?type=cat&rarity=rare. Records a
@@ -48,13 +48,11 @@ function useGiftLink(): void {
 function LoadingSplash(): React.ReactElement {
   return (
     <SafeAreaView style={styles.loadingArea}>
-      <View style={styles.loadingContent}>
-        <DeviceFrame>
-          <View style={styles.loadingInner} accessible accessibilityLabel="Loading">
-            <PixelText variant="sm" color={LCD_SHADE2}>LOADING</PixelText>
-          </View>
-        </DeviceFrame>
-      </View>
+      <DeviceFrame>
+        <View style={styles.loadingInner} accessible accessibilityLabel="Loading">
+          <PixelText variant="sm" color={LCD_SHADE2}>LOADING</PixelText>
+        </View>
+      </DeviceFrame>
     </SafeAreaView>
   );
 }
@@ -63,7 +61,7 @@ function Root(): React.ReactElement {
   const { pet, actions, loading, mood } = usePet();
 
   const handleSelect = useCallback(
-    (petType: PetType) => actions.selectType(petType),
+    (petType: PetType, name: string) => actions.selectType(petType, name),
     [actions],
   );
 
@@ -80,7 +78,7 @@ export default function App(): React.ReactElement {
   // Fonts load in <200 ms on device; the dark background bridges that gap.
   return (
     <View style={styles.shell}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       {fontsLoaded && <Root />}
     </View>
   );
@@ -89,17 +87,11 @@ export default function App(): React.ReactElement {
 const styles = StyleSheet.create({
   shell: {
     flex: 1,
-    backgroundColor: SHELL_DARK,
+    backgroundColor: LCD_BG,
   },
   loadingArea: {
     flex: 1,
-    backgroundColor: SHELL_DARK,
-  },
-  loadingContent: {
-    flexGrow: 1,
-    paddingHorizontal: SPACE_6,
-    paddingVertical: SPACE_8,
-    flex: 1,
+    backgroundColor: LCD_BG,
   },
   loadingInner: {
     flex: 1,

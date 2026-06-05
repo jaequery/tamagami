@@ -48,7 +48,6 @@ import {
   COLOR_CRITICAL,
   COLOR_OVERLAY,
   COLOR_WARNING,
-  SHELL_DARK,
   SPACE_2,
   SPACE_4,
   SPACE_6,
@@ -607,12 +606,10 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
 const styles = StyleSheet.create({
   safeArea: {
     flex:            1,
-    backgroundColor: SHELL_DARK,
+    backgroundColor: LCD_BG,
   },
   scrollContent: {
-    flexGrow:          1,
-    paddingHorizontal: SPACE_6,
-    paddingVertical:   SPACE_8,
+    flexGrow: 1,
   },
   screenContent: {
     position: 'relative',
