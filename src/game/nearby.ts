@@ -38,8 +38,10 @@ const PREFIX = 'TG';
 const SEP = '\u001F'; // U+001F Unit Separator — never collides with a sanitized name
 const NAME_MAX = 10;
 
-const TYPE_TO_CODE: Record<PetType, string> = { plant: 'p', cat: 'c', dog: 'd' };
-const CODE_TO_TYPE: Record<string, PetType> = { p: 'plant', c: 'cat', d: 'dog' };
+// Cat-only now; the code is still carried for forward-compat. Any legacy code
+// (an old plant/dog broadcaster) simply decodes to a cat so a mixed-version room
+// still meets.
+const TYPE_TO_CODE: Record<PetType, string> = { cat: 'c' };
 
 const RARITY_TO_CODE: Record<Rarity, string> = {
   common: 'o', uncommon: 'u', rare: 'r', epic: 'e', secret: 's',
@@ -61,11 +63,9 @@ export function decodePayload(raw: string): PeerIdentity | null {
   if (parts.length !== 4 && parts.length !== 5) return null;
   const prefix = parts[0];
   const id = parts[1];
-  const code = parts[2];
   if (prefix !== PREFIX) return null;
   if (id.length === 0) return null;
-  const petType = CODE_TO_TYPE[code];
-  if (petType === undefined) return null;
+  const petType: PetType = 'cat'; // cat-only; the type code is ignored on decode
 
   let rarity: Rarity = 'common';
   let name: string;

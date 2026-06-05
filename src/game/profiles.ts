@@ -7,8 +7,8 @@
 
 import type { PetType } from './types';
 
-export type StatKey = 'hunger' | 'happiness' | 'health' | 'water';
-export type ActionKey = 'feed' | 'play' | 'water';
+export type StatKey = 'hunger' | 'happiness' | 'health';
+export type ActionKey = 'feed' | 'play';
 
 export interface StatDescriptor {
   key: StatKey;
@@ -17,40 +17,26 @@ export interface StatDescriptor {
 
 export interface PetProfile {
   type: PetType;
-  title: string;       // 'PLANT' | 'CAT' | 'DOG'
-  tagline: string;     // one-line care description on the selection card
+  title: string;       // 'CAT'
+  tagline: string;     // one-line care description
   stats: StatDescriptor[];
   actions: ActionKey[];
 }
 
-export const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
+export const PET_TYPES: readonly PetType[] = ['cat'];
 
-const ANIMAL_STATS: StatDescriptor[] = [
+const CAT_STATS: StatDescriptor[] = [
   { key: 'hunger', label: 'HUNGER' },
   { key: 'happiness', label: 'HAPPY' },
   { key: 'health', label: 'HEALTH' },
 ];
 
 export const PET_PROFILES: Record<PetType, PetProfile> = {
-  plant: {
-    type: 'plant',
-    title: 'PLANT',
-    tagline: 'Just add water. The easy one.',
-    stats: [{ key: 'water', label: 'WATER' }],
-    actions: ['water'],
-  },
   cat: {
     type: 'cat',
     title: 'CAT',
-    tagline: 'Feed it and play to keep it purring.',
-    stats: ANIMAL_STATS,
-    actions: ['feed', 'play'],
-  },
-  dog: {
-    type: 'dog',
-    title: 'DOG',
-    tagline: 'Feed it and play to keep its tail wagging.',
-    stats: ANIMAL_STATS,
+    tagline: 'Feed her and play to keep her purring.',
+    stats: CAT_STATS,
     actions: ['feed', 'play'],
   },
 };
@@ -59,7 +45,7 @@ export function profileFor(type: PetType): PetProfile {
   return PET_PROFILES[type];
 }
 
-/** True for the feed + play archetypes (cat, dog). */
+/** Cat-only now — kept so the (formerly type-gated) call sites still read clearly. */
 export function isAnimal(type: PetType): boolean {
-  return type === 'cat' || type === 'dog';
+  return type === 'cat';
 }

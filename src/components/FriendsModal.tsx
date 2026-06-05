@@ -29,7 +29,7 @@ interface FriendsModalProps {
   onClose: () => void;
 }
 
-const TYPE_TAG: Record<PetType, string> = { plant: 'P', cat: 'C', dog: 'D' };
+const TYPE_TAG: Record<PetType, string> = { cat: 'C' };
 
 function formatAgo(ms: number, now: number): string {
   const s = Math.max(0, Math.floor((now - ms) / 1000));

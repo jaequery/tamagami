@@ -37,6 +37,7 @@ import { ownerEventToday, currentAilment, momentToday } from '../game/engine';
 import { householdFromId } from '../game/household';
 import { buildLifeSummary } from '../game/lifeSummary';
 import { loadCaughtMoments, recordCaughtMoment } from '../game/momentCodex';
+import { hasSeenIntro, markIntroSeen } from '../game/intro';
 import { dayIndex } from '../game/events';
 import type { Ailment } from '../game/sickness';
 import type { OwnerEvent } from '../game/ownerLife';
@@ -62,6 +63,7 @@ import { LineageModal } from '../components/LineageModal';
 import { ShopModal } from '../components/ShopModal';
 import { CareerModal } from '../components/CareerModal';
 import { StoryModal } from '../components/StoryModal';
+import { ColdOpen } from '../components/ColdOpen';
 import {
   LCD_BG,
   LCD_DARK,
@@ -99,7 +101,6 @@ function formatClock(seconds: number): string {
 function causeOfDeathLabel(cause: CauseOfDeath): string {
   switch (cause) {
     case 'starvation': return 'STARVATION';
-    case 'thirst':     return 'THIRST';
     case 'neglect':    return 'NEGLECT';
     case 'oldAge':     return 'OLD AGE';
     case 'illness':    return 'ILLNESS';
@@ -117,9 +118,8 @@ interface ActionButtonSpec {
 }
 
 const ACTION_SPECS: Record<ActionKey, ActionButtonSpec> = {
-  feed:  { label: 'FEED',  glyph: '*', accessibilityLabel: 'Feed your pet',   run: (a) => a.feed() },
-  play:  { label: 'PLAY',  glyph: '>', accessibilityLabel: 'Play with your pet', run: (a) => a.play() },
-  water: { label: 'WATER', glyph: '~', accessibilityLabel: 'Water your plant', run: (a) => a.water() },
+  feed:  { label: 'FEED', glyph: '*', accessibilityLabel: 'Feed your cat',     run: (a) => a.feed() },
+  play:  { label: 'PLAY', glyph: '>', accessibilityLabel: 'Play with your cat', run: (a) => a.play() },
 };
 
 // ─── Critical Attention Indicator ────────────────────────────────────────────
@@ -547,12 +547,6 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
     actions.play();
   }, [actions]);
 
-  // WATER = the plant drinking, shown with the 'eat' animation.
-  const handleWater = useCallback(() => {
-    triggerActivity('eat');
-    actions.water();
-  }, [actions, triggerActivity]);
-
   // FEED actually happens in the shop; play 'eat' on a successful buy.
   const handleBuyFood = useCallback((foodId: string) => {
     triggerActivity('eat');
@@ -580,6 +574,35 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const [storyOpen, setStoryOpen] = useState(false);
   const handleOpenStory = useCallback(() => setStoryOpen(true), []);
   const handleCloseStory = useCallback(() => setStoryOpen(false), []);
+
+  // ── Cold open: the birth cinematic (§1–3), once per pet / heir ──
+  // 'checking' until we've read the seen-set; 'play' for a fresh, unseen pet;
+  // 'done' otherwise. Re-checks only when the pet identity (bornAt) changes — so
+  // an heir created in place (continueLine) replays it, but ticks don't.
+  const [introState, setIntroState] = useState<'checking' | 'play' | 'done'>('checking');
+  useEffect(() => {
+    let cancelled = false;
+    void hasSeenIntro(pet.bornAt).then((seen) => {
+      if (cancelled) return;
+      // Only a brand-new adoption / heir plays it; an established (pre-feature) or
+      // dead pet is silently marked seen so the cinematic never retro-fires. The
+      // birth story is cat-first (cat/dog) — a plant skips it (its copy is feline).
+      if (!seen && animal && pet.ageSeconds < 120 && !pet.isDead) {
+        setIntroState('play');
+      } else {
+        setIntroState('done');
+        if (!seen) void markIntroSeen(pet.bornAt);
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pet.bornAt]);
+
+  const handleIntroDone = useCallback(() => {
+    void markIntroSeen(pet.bornAt);
+    setReveal(null); // drop any hatch reveal that queued while the cinematic played
+    setIntroState('done');
+  }, [pet.bornAt]);
 
   // "Comforted today" hides the comfort button + shows the cat's act; it naturally
   // re-arms on a new day (the compare misses tomorrow's day-index).
@@ -745,15 +768,13 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 {profile.actions.map((key) => {
                   const spec = ACTION_SPECS[key];
                   const isFeed = key === 'feed';
-                  // FEED opens the shop; PLAY/WATER also trigger a pet animation
-                  // before running the underlying action.
+                  // FEED opens the shop; PLAY triggers a pet animation before the
+                  // underlying action.
                   const onPress = isFeed
                     ? handleOpenShop
                     : key === 'play'
                       ? handlePlay
-                      : key === 'water'
-                        ? handleWater
-                        : () => spec.run(actions);
+                      : () => spec.run(actions);
                   return (
                     <PixelButton
                       key={key}
@@ -761,7 +782,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                       glyph={spec.glyph}
                       onPress={onPress}
                       disabled={pet.isDead}
-                      accessibilityLabel={isFeed ? 'Open the food shop to feed your pet' : spec.accessibilityLabel}
+                      accessibilityLabel={isFeed ? 'Open the food shop to feed your cat' : spec.accessibilityLabel}
                     />
                   );
                 })}
@@ -878,7 +899,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
         onClose={handleCloseCodex}
       />
 
-      {reveal !== null && (
+      {reveal !== null && introState !== 'play' && (
         <RevealOverlay
           key={reveal.nonce}
           petType={pet.petType}
@@ -888,6 +909,8 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
           onDone={handleRevealDone}
         />
       )}
+
+      {introState === 'play' && <ColdOpen pet={pet} onDone={handleIntroDone} />}
 
       {eventReveal !== null && (
         <EventReveal

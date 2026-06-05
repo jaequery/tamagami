@@ -14,8 +14,10 @@ import type { PetEconomy, PetState, PetType, Rarity } from './types';
 
 // ─── Runtime validation ───────────────────────────────────────────────────────
 
-const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
-const VALID_CAUSES = [null, 'starvation', 'thirst', 'neglect', 'oldAge', 'illness'];
+// Cat-only now. A legacy plant/dog save fails this check and routes to selection
+// (a fresh cat) — the same intentional no-migration policy as past type changes.
+const PET_TYPES: readonly PetType[] = ['cat'];
+const VALID_CAUSES = [null, 'starvation', 'neglect', 'oldAge', 'illness'];
 
 /** Returns true iff value is a finite number within [min, max] (inclusive). */
 function isFiniteInRange(value: unknown, min: number, max: number): boolean {

@@ -954,9 +954,12 @@ The pure, deterministic, fully-tested engine spine for every section exists (all
 identity, no `Math.random`, all save-tolerant with no version bump) **and is now surfaced in the live
 screens**: HomeScreen shows cat-years + cat stage names, season + weather, a TODAY panel (sickness→TEND,
 her person's day→COMFORT/CELEBRATE, a catchable daily moment), a [STORY] modal (origin + home + the
-unmetered bond), and a life-summary death screen; the name step carries the §3 ceremony copy. What remains
-per section is the **cold-open cinematics and the hand-pixeled sprite/Swift-widget art**, which need a
-simulator to build and verify.
+unmetered bond), and a life-summary death screen; the name step carries the §3 ceremony copy. **The §1–3
+cold-open cinematic is built** (`ColdOpen.tsx`): the dark + two heartbeats, the womb, the contraction, the
+birth flash, the dramatized journey to you, meeting your person, and the clock waking — auto-paced with
+tap-to-hurry, played once per pet/heir. What remains is the **hand-pixeled per-stage sprite art and the
+Swift lock-screen widget poses** (the cinematic currently uses the existing baby sprite + the LCD aesthetic),
+which need a simulator/device to build and verify.
 
 | § | Felt beat | Engine (shipped + tested) | Still needs (UI / art) |
 |---|---|---|---|

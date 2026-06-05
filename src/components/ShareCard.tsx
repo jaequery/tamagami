@@ -49,7 +49,6 @@ interface ShareCardProps {
 function causeLabel(cause: CauseOfDeath): string {
   switch (cause) {
     case 'starvation': return 'STARVATION';
-    case 'thirst':     return 'THIRST';
     case 'neglect':    return 'NEGLECT';
     case 'oldAge':     return 'OLD AGE';
     case 'illness':    return 'ILLNESS';

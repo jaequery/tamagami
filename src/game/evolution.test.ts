@@ -15,7 +15,7 @@ import {
 import { paletteForRarity } from './palettes';
 import type { PetType, Rarity } from './types';
 
-const PET_TYPES: PetType[] = ['plant', 'cat', 'dog'];
+const PET_TYPES: PetType[] = ['cat'];
 
 // ─── stageFor ─────────────────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ describe('rollRarity', () => {
   });
 
   it('produces a valid rarity', () => {
-    expect(RARITIES).toContain(rollRarity(1_700_000_000_000, 'Pixel', 'dog'));
+    expect(RARITIES).toContain(rollRarity(1_700_000_000_000, 'Pixel', 'cat'));
   });
 
   it('spreads across multiple rarities over many seeds', () => {
@@ -124,8 +124,8 @@ describe('form catalog', () => {
 
   it('names a form as EPITHET TYPE', () => {
     expect(formName('cat', 'rare')).toBe('AMBER CAT');
-    expect(formName('plant', 'common')).toBe('MOSS PLANT');
-    expect(formName('dog', 'secret')).toBe('LUNAR DOG');
+    expect(formName('cat', 'common')).toBe('MOSS CAT');
+    expect(formName('cat', 'secret')).toBe('LUNAR CAT');
   });
 });
 

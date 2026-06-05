@@ -17,7 +17,6 @@ import {
   simulate,
   socialize,
   treat,
-  water,
   witnessEvent,
 } from '../game/engine';
 import { isWorking } from '../game/economy';
@@ -163,11 +162,6 @@ export function usePet(): UsePet {
     applyState(play(petRef.current, Date.now()), true);
   }, [applyState]);
 
-  const actionWater = useCallback(() => {
-    if (petRef.current === null) return;
-    applyState(water(petRef.current, Date.now()), true);
-  }, [applyState]);
-
   const actionSocialize = useCallback(() => {
     if (petRef.current === null || petRef.current.isDead) return;
     applyState(socialize(petRef.current, Date.now()), true);
@@ -255,7 +249,6 @@ export function usePet(): UsePet {
   const actions: PetActions = useMemo(() => ({
     feed: actionFeed,
     play: actionPlay,
-    water: actionWater,
     socialize: actionSocialize,
     witnessEvent: actionWitnessEvent,
     treat: actionTreat,
@@ -269,7 +262,7 @@ export function usePet(): UsePet {
     quitJob: actionQuitJob,
     toggleWork: actionToggleWork,
     enroll: actionEnroll,
-  }), [actionFeed, actionPlay, actionWater, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
+  }), [actionFeed, actionPlay, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
 
   return {
     pet,

@@ -13,7 +13,7 @@ import { FRIENDS_KEY, SOCIAL_COOLDOWN_MS } from './constants';
 import { RARITIES } from './evolution';
 import type { Friend, PeerIdentity, PetType, Rarity } from './types';
 
-const PET_TYPES: readonly PetType[] = ['plant', 'cat', 'dog'];
+const PET_TYPES: readonly PetType[] = ['cat'];
 
 /** Coerce a possibly-missing/invalid stored rarity to a valid one (legacy → common). */
 function coerceRarity(value: unknown): Rarity {

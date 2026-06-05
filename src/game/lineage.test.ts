@@ -48,7 +48,7 @@ describe('rollHeirRarity', () => {
   it('a secret bloodline reaches secret far more than a fresh roll would', () => {
     let secretHeirs = 0;
     for (let i = 0; i < 300; i++) {
-      if (rollHeirRarity(NOW + i * 1000, `p${i}`, 'dog', 'secret') === 'secret') secretHeirs++;
+      if (rollHeirRarity(NOW + i * 1000, `p${i}`, 'cat', 'secret') === 'secret') secretHeirs++;
     }
     // Base secret rate is 1%; inheritance must lift it well above that.
     expect(secretHeirs).toBeGreaterThan(15);
@@ -67,7 +67,7 @@ describe('createHeir', () => {
   });
 
   it('starts the heir fresh as its own egg', () => {
-    const parent = { ...createInitialPet('Dynasty', 'dog', NOW), generation: 4, events: ['meteor'] };
+    const parent = { ...createInitialPet('Dynasty', 'cat', NOW), generation: 4, events: ['meteor'] };
     const heir = createHeir(parent, NOW + 5000);
     expect(heir.generation).toBe(5);
     expect(heir.ageSeconds).toBe(0);
@@ -77,9 +77,9 @@ describe('createHeir', () => {
   });
 
   it('inherits at least its own base roll', () => {
-    const parent = createInitialPet('Dynasty', 'plant', NOW);
+    const parent = createInitialPet('Dynasty', 'cat', NOW);
     const heir = createHeir(parent, NOW + 5000);
-    const base = rollRarity(NOW + 5000, 'Dynasty', 'plant');
+    const base = rollRarity(NOW + 5000, 'Dynasty', 'cat');
     expect(rarityRank(heir.rarity)).toBeGreaterThanOrEqual(rarityRank(base));
   });
 });
@@ -106,7 +106,7 @@ describe('ancestorFrom', () => {
   });
 
   it('lets the caller override the time of death', () => {
-    const pet = createInitialPet('Ghost', 'dog', NOW);
+    const pet = createInitialPet('Ghost', 'cat', NOW);
     expect(ancestorFrom(pet, NOW + 42).diedAt).toBe(NOW + 42);
   });
 });
