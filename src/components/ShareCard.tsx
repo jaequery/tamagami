@@ -91,7 +91,8 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
     // origin's drama) and where she landed, but WITHHOLD the form — the receiver
     // has to install to see what she becomes (GAME.md §10: "seal, don't spoil").
     // Falls back to the plain form line only if the life story is somehow absent.
-    const sentTo = household ? `, and sent to ${household.person}` : '';
+    const owner = pet.ownerName.trim() || household?.person || '';
+    const sentTo = owner ? `, and sent to ${owner}` : '';
     const sealedOrigin = origin
       ? `Something ${rarityEpithet(pet.rarity)} was ${origin.tone}${sentTo}. Meet ${name}.${touched}\n`
         + `Hatch your own mystery pet: ${deepLink}`

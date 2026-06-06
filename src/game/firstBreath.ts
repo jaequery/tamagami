@@ -51,6 +51,23 @@ export const EYES_OPEN_LINES: readonly string[] = [
   'but it stopped trembling.',
 ];
 
+// §2 pre-birth — the player names THEMSELVES (YOU), before her eyes open.
+export const OWNER_NAME_PROMPT_LINES: readonly string[] = [
+  'before any of this —',
+  'what\'s your name?',
+];
+
+// §2 the meeting — bond-only (no household / family / situation). She arrives, and
+// the first thing in the world is you.
+export function meetingLines(owner: string): string[] {
+  return ['and then there was a door,', `and behind it — ${owner}.`];
+}
+
+// §2 the naming ceremony — YOU give her her name.
+export function ownerNamesYouLines(owner: string): string[] {
+  return [`${owner} looks at you a long moment.`, `${owner} will name you…`];
+}
+
 // Beat 2 — the naming ask (a ceremony, not a label field).
 export const NAMING_PROMPT_LINES: readonly string[] = [
   'the small ones become someone the moment they\'re named.',

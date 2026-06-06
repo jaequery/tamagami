@@ -33,11 +33,13 @@ export const COLOR_TEAR           = LCD_SHADE2;  // tear drop — dark green (sa
 
 // ─── Typography ────────────────────────────────────────────────────────────
 export const FONT_FAMILY  = 'PressStart2P_400Regular';
-export const FONT_TINY    = 6;   // labels inside stat bars
-export const FONT_SM      = 8;   // stat labels, sub-labels
-export const FONT_MD      = 10;  // main body text, button labels
-export const FONT_LG      = 14;  // pet name / emphasis
-export const FONT_XL      = 18;  // title / death screen heading
+// PressStart2P is a blocky pixel font — small sizes are hard to read, so the
+// scale starts higher than a typical UI font would.
+export const FONT_TINY    = 9;   // labels inside stat bars, footer chips
+export const FONT_SM      = 11;  // stat labels, sub-labels
+export const FONT_MD      = 13;  // main body text, button labels
+export const FONT_LG      = 17;  // pet name / emphasis
+export const FONT_XL      = 22;  // title / death screen heading
 
 // ─── Pixel Grid ────────────────────────────────────────────────────────────
 // All dimensions snap to multiples of PIXEL so edges stay crisp.

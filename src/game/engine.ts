@@ -52,15 +52,15 @@ function clamp(value: number, min = 0, max = 100): number {
 
 /** Strip non-printable / control characters, trim whitespace, clamp to 20 chars.
  *  Falls back to 'Pixel' for empty / whitespace-only input. */
-function sanitizeName(raw: string): string {
+function sanitizeName(raw: string, fallback = 'Pixel'): string {
   // Remove control characters (U+0000–U+001F, U+007F–U+009F)
   const stripped = raw.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim().slice(0, 20);
-  return stripped.length > 0 ? stripped : 'Pixel';
+  return stripped.length > 0 ? stripped : fallback;
 }
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
-export function createInitialPet(name: string, petType: PetType, now: number, luck = 0): PetState {
+export function createInitialPet(name: string, petType: PetType, now: number, luck = 0, ownerName = ''): PetState {
   const cleanName = sanitizeName(name);
   // All three life-story facts are dealt off the birth identity, not chosen
   // (GAME.md's surprise-over-choice pillar). Origin is biased by the rarity it's
@@ -88,6 +88,7 @@ export function createInitialPet(name: string, petType: PetType, now: number, lu
     generation: 1,
     origin,
     household,
+    ownerName: sanitizeName(ownerName, ''), // '' until the player names themselves in the cold open
     bond: BOND_SEED,
     ownerMood: OWNER_MOOD_SEED,
     lastTreatedDay: null,
@@ -152,6 +153,8 @@ export function createHeir(parent: PetState, now: number, luck = 0): PetState {
     rarity: heirRarity,
     origin: rollOrigin(now, base.name, parent.petType, heirRarity),
     household,
+    // Same owner across the bloodline (§9) — the heir comes to YOU, by your name.
+    ownerName: parent.ownerName ?? '',
     generation: (parent.generation ?? 1) + 1,
     // A new kitten is a new relationship → the bond starts fresh. But it comes to
     // the SAME person, so the owner's mood carries forward (the new kitten often
@@ -398,6 +401,11 @@ export function restart(state: PetState, now: number, petType?: PetType, name?: 
 
 export function rename(state: PetState, name: string): PetState {
   return { ...state, name: sanitizeName(name) };
+}
+
+/** Set YOU — the player's name, captured in the cold open (§2). Empty defaults to "You". */
+export function nameOwner(state: PetState, name: string): PetState {
+  return { ...state, ownerName: sanitizeName(name, 'You') };
 }
 
 // ─── Mood ─────────────────────────────────────────────────────────────────────

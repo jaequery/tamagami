@@ -11,6 +11,7 @@ import {
   enroll,
   feed,
   getMood,
+  nameOwner as engineNameOwner,
   play,
   quitJob,
   rename as engineRename,
@@ -48,6 +49,10 @@ export function usePet(): UsePet {
 
   // ── Persist helper ────────────────────────────────────────────────────────
   const persist = useCallback(async (state: PetState, force = false): Promise<void> => {
+    // Never persist an UNNAMED founder — she only exists in memory while the cold
+    // open is collecting her name. Quitting mid-cinematic restarts it fresh, and
+    // validatePetState never has to see an empty name.
+    if (state.name.trim() === '') return;
     const now = Date.now();
     if (!force && now - lastPersistRef.current < PERSIST_INTERVAL_MS) return;
     lastPersistRef.current = now;
@@ -201,6 +206,24 @@ export function usePet(): UsePet {
     });
   }, [applyState]);
 
+  // First launch / post-reset: bring an UNNAMED cat into memory so the cold open
+  // can play and name her (the player names themselves, then her). Held in memory
+  // only (persist() skips empty-name pets) — she's saved the instant she's named.
+  const actionBegin = useCallback(() => {
+    if (petRef.current !== null) return; // a founder is already in flight
+    void Promise.all([loadCharm(), consumeGiftLuck()]).then(([charm, gift]) => {
+      if (petRef.current !== null) return;
+      const founder = { ...createInitialPet('Pixel', 'cat', Date.now(), charm + gift), name: '' };
+      applyState(founder, false);
+    });
+  }, [applyState]);
+
+  const actionNameOwner = useCallback((name: string) => {
+    if (petRef.current === null) return;
+    // In-memory only while she's still unnamed; persisted once she gets her name.
+    applyState(engineNameOwner(petRef.current, name), false);
+  }, [applyState]);
+
   const actionReset = useCallback(() => {
     // Starting fresh still records the departed in the family tree before wiping.
     const cur = petRef.current;
@@ -255,6 +278,8 @@ export function usePet(): UsePet {
     comfortOwner: actionComfortOwner,
     continueLine: actionContinueLine,
     selectType: actionSelectType,
+    begin: actionBegin,
+    nameOwner: actionNameOwner,
     reset: actionReset,
     rename: actionRename,
     buyFood: actionBuyFood,
@@ -262,7 +287,7 @@ export function usePet(): UsePet {
     quitJob: actionQuitJob,
     toggleWork: actionToggleWork,
     enroll: actionEnroll,
-  }), [actionFeed, actionPlay, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
+  }), [actionFeed, actionPlay, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionBegin, actionNameOwner, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
 
   return {
     pet,

@@ -7,7 +7,7 @@ import React from 'react';
 import { Modal, ScrollView, View, StyleSheet } from 'react-native';
 import type { PetState } from '../game/types';
 import { isOriginId, originById, HANDOFF_LINES } from '../game/origins';
-import { householdFromId, contrastLine } from '../game/household';
+import { householdFromId } from '../game/household';
 import { bondLevel, bondBehaviors } from '../game/bond';
 import { ownerStageOf } from '../game/engine';
 import { ownerMoodBand } from '../game/ownerLife';
@@ -56,6 +56,8 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 export function StoryModal({ visible, pet, onClose }: StoryModalProps): React.ReactElement {
   const origin = isOriginId(pet.origin) ? originById(pet.origin) : null;
   const household = householdFromId(pet.household);
+  // Bond-only: her person is YOU (legacy saves fall back to the procedural name).
+  const personName = pet.ownerName.trim() || household?.person || '';
   const level = bondLevel(pet.bond ?? 0);
   const behaviors = bondBehaviors(pet.bond ?? 0);
 
@@ -81,22 +83,10 @@ export function StoryModal({ visible, pet, onClose }: StoryModalProps): React.Re
               </Section>
             )}
 
-            {household !== null && (
-              <Section label="WHERE SHE LANDED">
-                <PixelText variant="tiny" color={LCD_DARK} style={styles.beat}>{household.homeLine}</PixelText>
-                <PixelText variant="tiny" color={LCD_DARK} style={styles.beat}>{household.personLine}</PixelText>
-                {origin !== null && (
-                  <PixelText variant="tiny" color={LCD_SHADE2} style={styles.contrast}>
-                    {contrastLine(origin.id, household)}
-                  </PixelText>
-                )}
-              </Section>
-            )}
-
-            {household !== null && (
+            {personName !== '' && (
               <Section label="HER PERSON">
                 <PixelText variant="tiny" color={LCD_DARK} style={styles.beat}>
-                  {household.person} {OWNER_MOOD_LINE[ownerMoodBand(pet.ownerMood ?? 55)]}
+                  {personName} {OWNER_MOOD_LINE[ownerMoodBand(pet.ownerMood ?? 55)]}
                 </PixelText>
                 <PixelText variant="tiny" color={LCD_SHADE2} style={styles.beat}>
                   ({String(ownerStageOf(pet)).replace('_', ' ')})
@@ -157,11 +147,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACE_2,
   },
   beat: {
-    lineHeight: 12,
+    lineHeight: 16,
     marginBottom: SPACE_2,
   },
   contrast: {
-    lineHeight: 12,
+    lineHeight: 16,
     marginTop: SPACE_2,
     fontStyle: 'italic',
   },

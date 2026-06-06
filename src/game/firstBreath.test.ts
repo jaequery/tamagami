@@ -3,8 +3,11 @@ import {
   withName,
   namedConfirmation,
   clockPromiseLines,
+  meetingLines,
+  ownerNamesYouLines,
   EYES_OPEN_LINES,
   NAMING_PROMPT_LINES,
+  OWNER_NAME_PROMPT_LINES,
   FIRST_FEED_BID,
   HOME_LINE,
 } from './firstBreath';
@@ -42,5 +45,22 @@ describe('ceremony copy', () => {
     expect(NAMING_PROMPT_LINES.length).toBe(2);
     expect(FIRST_FEED_BID.length).toBeGreaterThan(0);
     expect(HOME_LINE.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the cold-open meeting (§2 — YOU, bond-only)', () => {
+  it('asks the player their name before the birth', () => {
+    expect(OWNER_NAME_PROMPT_LINES.length).toBe(2);
+  });
+
+  it('the meeting names YOU and nobody else (no household/family copy)', () => {
+    const lines = meetingLines('Dave');
+    expect(lines.join(' ')).toContain('Dave');
+  });
+
+  it('the naming ceremony hands the name to YOU', () => {
+    const lines = ownerNamesYouLines('Dave');
+    expect(lines.join(' ')).toContain('Dave');
+    expect(lines.join(' ').toLowerCase()).toContain('name you');
   });
 });

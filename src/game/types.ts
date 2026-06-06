@@ -65,7 +65,8 @@ export interface PetState {
   events: string[];      // world-event ids this pet has witnessed (its aura). See game/events.ts
   generation: number;    // 1 for a founder; +1 for each heir that continues the line
   origin: string;        // her dealt origin scenario id (the §1 cold open). See game/origins.ts
-  household: string;     // her dealt household id — tier:situation:nameIdx. See game/household.ts
+  household: string;     // her dealt household id — tier:situation:nameIdx (now an INVISIBLE economy seed only). See game/household.ts
+  ownerName: string;     // YOU — the player's name, entered in the cold open (§2). '' = legacy/unnamed → display falls back to household.person. See components/ColdOpen.tsx
   bond: number;          // §8 invisible affection 0..100, seeded low. See game/bond.ts
   ownerMood: number;     // §5 her person's mood 0..100, ebbs on the real clock. See game/ownerLife.ts
   lastTreatedDay: number | null; // §9 local day-index she was last treated for an ailment, or null
@@ -81,7 +82,9 @@ export interface PetActions {
   comfortOwner(): void;                              // §5 — the cat is there for her person (deepens bond, lifts mood)
   continueLine(): void;                              // dead pet → hatch an heir that inherits the line
   selectType(petType: PetType, name?: string): void; // create / restart a pet
-  reset(): void;                                     // clear pet → back to selection
+  begin(): void;                                     // first launch / post-reset → autocreate an UNNAMED founder; the cold open names her
+  nameOwner(name: string): void;                     // §2 — set YOU (the player's name), entered in the cold open
+  reset(): void;                                     // clear pet → back to a fresh cold open
   rename(name: string): void;
   // ── Economy (cat/dog) ──
   buyFood(foodId: string): void;                     // spend coins to feed

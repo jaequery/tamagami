@@ -52,6 +52,18 @@ describe('storage — origin/household round-trip + tolerance', () => {
     expect(loaded!.household).toBe(pet.household);
   });
 
+  it('round-trips the §2 owner name and defaults a legacy save to empty', async () => {
+    const pet = { ...createInitialPet('Sol', 'cat', NOW), ownerName: 'Dave' };
+    await savePet(pet);
+    expect((await loadPet())!.ownerName).toBe('Dave');
+
+    // A legacy save with no ownerName loads as '' (display falls back to household.person).
+    const legacy = JSON.parse(JSON.stringify(pet)) as Record<string, unknown>;
+    delete legacy.ownerName;
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+    expect((await loadPet())!.ownerName).toBe('');
+  });
+
   it('round-trips the §3/§5/§9 fields and seeds them on a legacy save', async () => {
     const pet = { ...createInitialPet('Sol', 'cat', NOW), bond: 64, ownerMood: 30, lastTreatedDay: 19_500 };
     await savePet(pet);

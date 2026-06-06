@@ -139,6 +139,14 @@ function validatePetState(parsed: unknown): PetState | null {
     ? (p.household as string)
     : rollHousehold(p.bornAt as number, finalName, p.petType as PetType);
 
+  // ── ownerName: tolerant (§2 — YOU) ────────────────────────────────────────
+  // Added after the household shipped. A legacy save has no ownerName → '' here,
+  // and display falls back to the procedural household.person. Same control-char
+  // strip + length cap as a pet name; never a reason to reject the save.
+  const ownerName = typeof p.ownerName === 'string'
+    ? p.ownerName.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim().slice(0, 20)
+    : '';
+
   // ── bond / ownerMood / lastTreatedDay: tolerant (§3/§5/§9) ────────────────
   // Added after v3 shipped — repaired to their seeds rather than invalidating an
   // otherwise-valid save (same policy as events/generation/economy). Present-but-
@@ -164,6 +172,7 @@ function validatePetState(parsed: unknown): PetState | null {
     generation,
     origin,
     household,
+    ownerName,
     bond,
     ownerMood,
     lastTreatedDay,

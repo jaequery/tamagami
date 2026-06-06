@@ -258,12 +258,12 @@ const deathStyles = StyleSheet.create({
   },
   summaryLine: {
     textAlign:    'center',
-    lineHeight:   12,
+    lineHeight:   16,
     marginBottom: SPACE_2,
   },
   summaryClosing: {
     textAlign:  'center',
-    lineHeight: 12,
+    lineHeight: 16,
     marginTop:  SPACE_4,
   },
   continueRow: {
@@ -582,12 +582,16 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const [introState, setIntroState] = useState<'checking' | 'play' | 'done'>('checking');
   useEffect(() => {
     let cancelled = false;
+    // An UNNAMED founder MUST play the cinematic — that's where she gets her name
+    // (and the player gets theirs). A legacy save always has a real name, so it's
+    // safe; an unnamed pet is never marked seen until she's actually named.
+    const unnamed = animal && !pet.isDead && pet.name.trim() === '';
     void hasSeenIntro(pet.bornAt).then((seen) => {
       if (cancelled) return;
-      // Only a brand-new adoption / heir plays it; an established (pre-feature) or
-      // dead pet is silently marked seen so the cinematic never retro-fires. The
-      // birth story is cat-first (cat/dog) — a plant skips it (its copy is feline).
-      if (!seen && animal && pet.ageSeconds < 120 && !pet.isDead) {
+      // Forced for an unnamed founder; otherwise only a brand-new adoption / heir
+      // plays it. An established (pre-feature) or dead pet is silently marked seen
+      // so the cinematic never retro-fires.
+      if (unnamed || (!seen && animal && pet.ageSeconds < 120 && !pet.isDead)) {
         setIntroState('play');
       } else {
         setIntroState('done');
@@ -804,7 +808,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 ailment={ailment}
                 onTend={handleTend}
                 ownerEvent={ownerEvent}
-                person={household.person}
+                person={pet.ownerName.trim() ? pet.ownerName : household.person}
                 comforted={comfortedDay === todayKey}
                 onComfort={handleComfort}
                 moment={moment}
@@ -910,7 +914,14 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
         />
       )}
 
-      {introState === 'play' && <ColdOpen pet={pet} onDone={handleIntroDone} />}
+      {introState === 'play' && (
+        <ColdOpen
+          pet={pet}
+          onNameOwner={actions.nameOwner}
+          onNameCat={actions.rename}
+          onDone={handleIntroDone}
+        />
+      )}
 
       {eventReveal !== null && (
         <EventReveal
@@ -1022,12 +1033,12 @@ const styles = StyleSheet.create({
   },
   todayText: {
     textAlign:    'center',
-    lineHeight:   12,
+    lineHeight:   16,
     marginBottom: SPACE_2,
   },
   todayDone: {
     textAlign:  'center',
-    lineHeight: 12,
+    lineHeight: 16,
   },
   metaBar: {
     flexDirection:  'row',

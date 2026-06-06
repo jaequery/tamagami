@@ -80,11 +80,12 @@ export function StatBar({ label, value }: StatBarProps): React.ReactElement {
         })}
       </View>
 
-      {/* Value — FONT_SM (8pt), no space-padding that hides low numbers */}
+      {/* Value — single line so "100" never wraps to two rows */}
       <PixelText
         variant="sm"
         color={isCritical ? COLOR_CRITICAL : isLow ? COLOR_WARNING : LCD_DARK}
         style={styles.value}
+        numberOfLines={1}
       >
         {String(Math.round(clampedValue))}
       </PixelText>
@@ -99,7 +100,7 @@ const styles = StyleSheet.create({
     marginBottom:  SPACE_2,
   },
   label: {
-    width:       28,
+    width:       40,
     marginRight: SPACE_2,
   },
   segmentRow: {
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
   },
   value: {
     marginLeft: SPACE_4,
-    width:      22,
+    width:      40,
     textAlign:  'right',
   },
 });

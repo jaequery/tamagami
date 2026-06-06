@@ -4,6 +4,7 @@ import {
   createInitialPet,
   feed,
   getMood,
+  nameOwner,
   play,
   rename,
   restart,
@@ -168,6 +169,29 @@ describe('name sanitization', () => {
   it('restart sanitizes the provided name', () => {
     const next = restart(freshPet('cat', { isDead: true }), NOW, undefined, '  NewPet\x1F  ');
     expect(next.name).toBe('NewPet');
+  });
+});
+
+describe('ownerName (§2 — YOU)', () => {
+  it('a fresh pet starts with no owner name (filled in by the cold open)', () => {
+    expect(createInitialPet('Pixel', 'cat', NOW).ownerName).toBe('');
+  });
+
+  it('createInitialPet stores a provided owner name', () => {
+    expect(createInitialPet('Pixel', 'cat', NOW, 0, '  Dave  ').ownerName).toBe('Dave');
+  });
+
+  it('nameOwner sets + sanitizes the player name', () => {
+    expect(nameOwner(freshPet('cat'), '  Dave\x00  ').ownerName).toBe('Dave');
+  });
+
+  it('nameOwner defaults a blank entry to "You"', () => {
+    expect(nameOwner(freshPet('cat'), '   ').ownerName).toBe('You');
+  });
+
+  it('the heir comes to the SAME owner (carries ownerName forward)', () => {
+    const parent = { ...createInitialPet('Dynasty', 'cat', NOW), ownerName: 'Dave', isDead: true };
+    expect(createHeir(parent, NOW + 5000).ownerName).toBe('Dave');
   });
 });
 

@@ -75,11 +75,12 @@ export function buildLifeSummary(pet: PetState): LifeSummary {
     lines.push(`${capitalize(originById(pet.origin).summary)}.`);
   }
 
-  // §2 / §5 — who she got, and that she was there for them.
-  const household = householdFromId(pet.household);
-  if (household) {
-    lines.push(`She found her way to ${household.summary}.`);
-    lines.push(`She was there for ${household.person} — the hard days and the bright ones.`);
+  // §2 / §5 — who she got, and that she was there for them. Bond-only: it's YOU
+  // (legacy saves with no ownerName fall back to the procedural household.person).
+  const owner = pet.ownerName.trim() || householdFromId(pet.household)?.person || '';
+  if (owner) {
+    lines.push(`She found her way to ${owner}.`);
+    lines.push(`She was there for ${owner} — the hard days and the bright ones.`);
   }
 
   // §6 — who she became.

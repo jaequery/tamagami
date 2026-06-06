@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, SafeAreaView, StyleSheet, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
@@ -7,13 +7,12 @@ import {
   PressStart2P_400Regular,
 } from '@expo-google-fonts/press-start-2p';
 import { HomeScreen } from './src/screens/HomeScreen';
-import { PetSelectionScreen } from './src/screens/PetSelectionScreen';
 import { DeviceFrame } from './src/components/DeviceFrame';
 import { PixelText } from './src/components/PixelText';
 import { usePet } from './src/hooks/usePet';
 import { RARITIES, rarityEpithet } from './src/game/evolution';
 import { giftLuckFromRarity, setPendingGiftLuck } from './src/game/gift';
-import type { PetType, Rarity } from './src/game/types';
+import type { Rarity } from './src/game/types';
 import { LCD_BG, LCD_SHADE2 } from './src/theme';
 
 /**
@@ -60,13 +59,15 @@ function LoadingSplash(): React.ReactElement {
 function Root(): React.ReactElement {
   const { pet, actions, loading, mood } = usePet();
 
-  const handleSelect = useCallback(
-    (petType: PetType, name: string) => actions.selectType(petType, name),
-    [actions],
-  );
+  // There is no separate naming screen anymore (the cold open does the naming).
+  // On first launch / after a reset, bring an unnamed founder into memory so the
+  // birth cinematic can play and name her.
+  const begin = actions.begin;
+  useEffect(() => {
+    if (!loading && pet === null) begin();
+  }, [loading, pet, begin]);
 
-  if (loading) return <LoadingSplash />;
-  if (pet === null) return <PetSelectionScreen onSelect={handleSelect} />;
+  if (loading || pet === null) return <LoadingSplash />;
   return <HomeScreen pet={pet} actions={actions} mood={mood} />;
 }
 
