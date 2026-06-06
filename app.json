@@ -2,7 +2,7 @@
   "expo": {
     "name": "tamagami",
     "slug": "tamagami",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "scheme": "tamagami",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
