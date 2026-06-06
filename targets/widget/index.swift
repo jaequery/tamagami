@@ -1,10 +1,26 @@
 // index.swift
 // @main Widget struct + all entry views for TamaWidget.
-// Families: .systemSmall, .systemMedium (Home Screen)
+// Families: .systemSmall, .systemMedium, .systemLarge (Home Screen)
 //           .accessoryCircular, .accessoryRectangular, .accessoryInline (Lock Screen, iOS 16+)
 
 import WidgetKit
 import SwiftUI
+import Foundation
+
+// MARK: - Cat wander (the only "movement" a widget allows)
+//
+// A widget is a static snapshot, not a live canvas — so the cat can't animate in
+// real time. Instead each timeline entry places her at a new point on a gentle
+// looping path (keyed off the entry's date). WidgetKit advances entries on their
+// dates, and on iOS 17+ tweens between the two snapshots, so she reads as slowly
+// wandering — a step every ~10 minutes, not real-time motion.
+fileprivate func wanderOffset(date: Date, amplitudeX: CGFloat, amplitudeY: CGFloat) -> CGSize {
+    let step = floor(date.timeIntervalSince1970 / (10 * 60)) // one step per 10-min entry
+    let t = step * 0.7                                        // radians per step
+    let x = CGFloat(sin(t)) * amplitudeX
+    let y = CGFloat(sin(t * 0.5)) * amplitudeY               // slower vertical bob → loose ellipse
+    return CGSize(width: x, height: y)
+}
 
 // MARK: - Palette constants (shared by views in this file)
 
@@ -175,6 +191,100 @@ struct MediumWidgetView: View {
     }
 }
 
+// MARK: - systemLarge view
+
+struct LargeWidgetView: View {
+    let entry: TamaEntry
+
+    private var state: PetState { entry.state }
+    private var mood:  Mood     { entry.mood }
+
+    var body: some View {
+        ZStack {
+            LCD_BG_COLOR
+
+            if state.isDead {
+                deadLargeView
+            } else {
+                aliveLargeView
+            }
+        }
+        .modify { view in
+            if #available(iOSApplicationExtension 17.0, *) {
+                view.containerBackground(LCD_BG_COLOR, for: .widget)
+            } else {
+                view
+            }
+        }
+    }
+
+    private var aliveLargeView: some View {
+        VStack(spacing: 6) {
+            // Header — name + type · age
+            VStack(spacing: 2) {
+                Text(state.name)
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .foregroundColor(LCD_INK_COLOR)
+                    .lineLimit(1)
+                Text("\(state.petType.title)  \(ageLabel(state.ageSeconds))")
+                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                    .foregroundColor(LCD_DIM_COLOR)
+                    .lineLimit(1)
+            }
+            .padding(.top, 10)
+
+            // Play area — the cat wanders within these bounds
+            GeometryReader { geo in
+                let off = wanderOffset(
+                    date: entry.date,
+                    amplitudeX: geo.size.width  * 0.32,
+                    amplitudeY: geo.size.height * 0.20
+                )
+                PixelSprite(petType: state.petType, mood: mood, cellSize: 5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .offset(x: off.width, y: off.height)
+                    .modify { v in
+                        if #available(iOSApplicationExtension 17.0, *) {
+                            v.animation(.easeInOut(duration: 1.2), value: entry.date)
+                        } else {
+                            v
+                        }
+                    }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // All stats, full-width segmented bars
+            VStack(spacing: 5) {
+                ForEach(Array(statBars(for: state).enumerated()), id: \.offset) { _, stat in
+                    CompactStatBar(label: stat.label, value: stat.value, segments: 10, labelWidth: 46)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 12)
+        }
+    }
+
+    private var deadLargeView: some View {
+        VStack(spacing: 6) {
+            Spacer()
+            PixelSprite(petType: state.petType, mood: .dead, cellSize: 5)
+            Text("R.I.P. \(state.name)")
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .foregroundColor(LCD_INK_COLOR)
+            if let cause = state.causeOfDeath {
+                Text("Cause: \(cause.rawValue)")
+                    .font(.system(size: 9, weight: .regular, design: .monospaced))
+                    .foregroundColor(LCD_DIM_COLOR)
+            }
+            Text("Lived \(ageLabel(state.ageSeconds))")
+                .font(.system(size: 9, weight: .regular, design: .monospaced))
+                .foregroundColor(LCD_DIM_COLOR)
+            Spacer()
+        }
+        .padding(12)
+    }
+}
+
 // MARK: - accessory views (iOS 16+)
 
 @available(iOSApplicationExtension 16.0, *)
@@ -280,12 +390,13 @@ struct TamaWidget: Widget {
             return [
                 .systemSmall,
                 .systemMedium,
+                .systemLarge,
                 .accessoryCircular,
                 .accessoryRectangular,
                 .accessoryInline,
             ]
         } else {
-            return [.systemSmall, .systemMedium]
+            return [.systemSmall, .systemMedium, .systemLarge]
         }
     }
 }
@@ -302,6 +413,8 @@ struct TamaWidgetEntryView: View {
             SmallWidgetView(entry: entry)
         case .systemMedium:
             MediumWidgetView(entry: entry)
+        case .systemLarge:
+            LargeWidgetView(entry: entry)
         default:
             accessoryBody
         }

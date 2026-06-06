@@ -43,9 +43,13 @@ struct TamaProvider: TimelineProvider {
         // First entry = current time
         var entries: [TamaEntry] = []
 
-        let intervalMinutes: Double = 15
+        // 10-minute cadence: drives both stat-decay smoothness AND the Large
+        // widget's cat wander (each entry repositions the cat). WidgetKit advances
+        // through pre-supplied entries on their dates WITHOUT spending reload
+        // budget, so a finer cadence is free liveliness.
+        let intervalMinutes: Double = 10
         let totalHours: Double      = 6
-        let count = Int(totalHours * 60 / intervalMinutes) + 1  // ~25 entries
+        let count = Int(totalHours * 60 / intervalMinutes) + 1  // ~37 entries
 
         for i in 0..<count {
             let offsetSeconds = Double(i) * intervalMinutes * 60
