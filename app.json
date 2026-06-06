@@ -2,7 +2,7 @@
   "expo": {
     "name": "tamagami",
     "slug": "tamagami",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "scheme": "tamagami",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -43,7 +43,8 @@
           "iosDisplayInForeground": true
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "expo-audio"
     ],
     "extra": {
       "eas": {

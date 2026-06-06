@@ -67,6 +67,8 @@ import { PlayModal } from '../components/PlayModal';
 import { CareerModal } from '../components/CareerModal';
 import { StoryModal } from '../components/StoryModal';
 import { ColdOpen } from '../components/ColdOpen';
+import { BackgroundMusic } from '../components/BackgroundMusic';
+import { useMusicMuted } from '../hooks/useMusicMuted';
 import {
   LCD_BG,
   LCD_DARK,
@@ -416,6 +418,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   // friendsOpenedAt doubles as the "open" flag and the reference time for the
   // friends list's relative timestamps (captured in the event handler, so the
   // render path stays pure).
+  const [musicMuted, toggleMusic] = useMusicMuted();
   const [friendsOpenedAt, setFriendsOpenedAt] = useState<number | null>(null);
 
   const handleCloseFriends = useCallback(() => setFriendsOpenedAt(null), []);
@@ -672,6 +675,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <BackgroundMusic muted={musicMuted} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -890,6 +894,17 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 accessibilityLabel={`Open codex, ${discovered.size} of ${TOTAL_FORMS} forms found`}
               >
                 <PixelText variant="tiny" color={LCD_DARK}>CODEX {discovered.size}/{TOTAL_FORMS}</PixelText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={toggleMusic}
+                hitSlop={{ top: SPACE_4, bottom: SPACE_4, left: SPACE_4, right: SPACE_4 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !musicMuted }}
+                accessibilityLabel={musicMuted ? 'Music off — tap to play' : 'Music on — tap to mute'}
+              >
+                <PixelText variant="tiny" color={musicMuted ? LCD_SHADE2 : LCD_DARK}>
+                  {musicMuted ? 'MUSIC OFF' : 'MUSIC ON'}
+                </PixelText>
               </TouchableOpacity>
             </View>
 
