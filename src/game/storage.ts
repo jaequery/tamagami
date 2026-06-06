@@ -10,7 +10,12 @@ import {
   jobById,
   MAX_EDUCATION,
 } from './economy';
-import type { PetEconomy, PetState, PetType, Rarity } from './types';
+import {
+  accessoryById,
+  defaultCosmetics,
+  type AccessorySlot,
+} from './cosmetics';
+import type { PetCosmetics, PetEconomy, PetState, PetType, Rarity } from './types';
 
 // ─── Runtime validation ───────────────────────────────────────────────────────
 
@@ -66,6 +71,38 @@ function validateEconomy(raw: unknown): PetEconomy {
     studyId: studyValid ? studyId : null,
     studyEndsAt: studyValid ? studyEndsAt : null,
   };
+}
+
+/**
+ * Coerce a parsed `cosmetics` blob into a valid PetCosmetics. Lenient by design,
+ * like validateEconomy: the wardrobe was added after v3 shipped, so a missing or
+ * partly-malformed value is repaired to the empty default rather than resetting
+ * the pet. Unknown accessory ids are dropped; an equipped item is only honored if
+ * it's a known accessory of that slot AND actually owned.
+ */
+function validateCosmetics(raw: unknown): PetCosmetics {
+  const base = defaultCosmetics();
+  if (typeof raw !== 'object' || raw === null) return base;
+  const c = raw as Record<string, unknown>;
+
+  // Owned: keep only strings that name an accessory still in the catalog.
+  const owned = Array.isArray(c.owned)
+    ? Array.from(new Set(c.owned.filter((id): id is string => typeof id === 'string' && accessoryById(id) !== null)))
+    : [];
+
+  const equipped = { ...base.equipped };
+  const rawEquipped = (typeof c.equipped === 'object' && c.equipped !== null)
+    ? (c.equipped as Record<string, unknown>)
+    : {};
+  for (const slot of ['head', 'face', 'neck'] as AccessorySlot[]) {
+    const id = rawEquipped[slot];
+    const def = typeof id === 'string' ? accessoryById(id) : null;
+    if (def !== null && def.slot === slot && owned.includes(def.id)) {
+      equipped[slot] = def.id;
+    }
+  }
+
+  return { owned, equipped };
 }
 
 /**
@@ -177,6 +214,7 @@ function validatePetState(parsed: unknown): PetState | null {
     ownerMood,
     lastTreatedDay,
     economy: validateEconomy(p.economy),
+    cosmetics: validateCosmetics(p.cosmetics),
     stats: {
       hunger: s.hunger as number,
       happiness: s.happiness as number,

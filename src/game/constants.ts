@@ -20,14 +20,19 @@ export const HAPPINESS_DECAY_PER_SECOND = 100 / (5 * 60 * 60);
 // Health drains while a core need is critically low, regenerates when both are met.
 export const HUNGER_CRITICAL_THRESHOLD = 15;
 export const HAPPINESS_CRITICAL_THRESHOLD = 15;
-// neglected → dead over ~8h
+// neglected → SICK (sinks toward the floor) over ~8h, never dead.
 export const HEALTH_DECAY_CRITICAL_PER_SECOND = 100 / (8 * 60 * 60);
 // full regen over ~4h when hunger & happiness are both above critical
 export const HEALTH_REGEN_PER_SECOND = 100 / (4 * 60 * 60);
+// Forgiving care (DIRECTION.md): neglect makes her look unwell but CANNOT kill —
+// health bottoms out here, not at 0. A missed feeding, an 8h sleep, a long day
+// away → a sad/sick cat that fully recovers on the next feed, never a dead one.
+export const HEALTH_NEGLECT_FLOOR = 10;
 
 // ─── Death ───────────────────────────────────────────────────────────────────
-// health → 0 → dead. cause = 'starvation' if hunger was critical, else 'neglect'.
-// (Old age + illness are the other, gentler causes — see lifespan.ts / sickness.ts.)
+// The care loop has exactly ONE end now: old age — the gentle, expected close
+// (see lifespan.ts). Neglect/starvation no longer kill. Illness is recoverable
+// (see sickness.ts); any deeper opt-in death is layered on top, never the default.
 
 // ─── Action effects ──────────────────────────────────────────────────────────
 // FEED

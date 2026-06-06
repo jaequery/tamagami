@@ -26,12 +26,21 @@ import {
   withoutJob,
 } from './economy';
 import {
+  accessoryById,
+  acquireCosmetic,
+  defaultCosmetics,
+  ownsAccessory,
+  toggleCosmetic,
+} from './cosmetics';
+import { playById } from './play';
+import {
   CURRENT_VERSION,
   FEED_HAPPINESS_DELTA,
   FEED_HUNGER_BOOST,
   HAPPINESS_CRITICAL_THRESHOLD,
   HAPPINESS_DECAY_PER_SECOND,
   HEALTH_DECAY_CRITICAL_PER_SECOND,
+  HEALTH_NEGLECT_FLOOR,
   HEALTH_REGEN_PER_SECOND,
   HUNGER_CRITICAL_THRESHOLD,
   HUNGER_DECAY_PER_SECOND,
@@ -93,6 +102,7 @@ export function createInitialPet(name: string, petType: PetType, now: number, lu
     ownerMood: OWNER_MOOD_SEED,
     lastTreatedDay: null,
     economy: { ...defaultEconomy(), coins: startingCoinsForHousehold(household) },
+    cosmetics: defaultCosmetics(),
   };
 }
 
@@ -165,6 +175,8 @@ export function createHeir(parent: PetState, now: number, luck = 0): PetState {
     // The heir inherits the family savings — a bequest — but starts its own
     // career and schooling from scratch.
     economy: { ...defaultEconomy(), coins: parent.economy?.coins ?? defaultEconomy().coins },
+    // A new kitten is a new wardrobe: the coins carry forward, the collar doesn't.
+    cosmetics: defaultCosmetics(),
   };
 }
 
@@ -203,26 +215,24 @@ function simulateAnimal(
   const hunger = clamp(state.stats.hunger - HUNGER_DECAY_PER_SECOND * elapsed);
   const happiness = clamp(state.stats.happiness - HAPPINESS_DECAY_PER_SECOND * elapsed + happinessDelta);
 
+  // §8 — forgiving care: neglect makes her SICK, never dead. When a need is critical,
+  // health sinks toward HEALTH_NEGLECT_FLOOR (so she looks unwell + the reunion lands)
+  // but can't bottom out — an 8h sleep or a long day away never ends the cat. A floored
+  // pet springs straight back the moment you feed her.
   let health = state.stats.health;
   const hungerCritical = hunger <= HUNGER_CRITICAL_THRESHOLD;
   const happinessCritical = happiness <= HAPPINESS_CRITICAL_THRESHOLD;
   if (hungerCritical || happinessCritical) {
-    health -= HEALTH_DECAY_CRITICAL_PER_SECOND * elapsed;
+    health = Math.max(HEALTH_NEGLECT_FLOOR, health - HEALTH_DECAY_CRITICAL_PER_SECOND * elapsed);
   } else {
-    health += HEALTH_REGEN_PER_SECOND * elapsed;
+    health = clamp(health + HEALTH_REGEN_PER_SECOND * elapsed);
   }
-  health = clamp(health);
 
+  // §9 — the good death: a long life ends gently of old age. This is the natural,
+  // *expected* close, never a fail-state — and now the ONLY way the care loop ends.
   let isDead = false;
   let causeOfDeath: CauseOfDeath = null;
-  if (health === 0) {
-    isDead = true;
-    causeOfDeath = hungerCritical ? 'starvation' : 'neglect';
-  }
-  // §9 — the good death: a long life ends gently of old age. This is the natural,
-  // *expected* close (never a fail-state) and takes precedence narratively, but a
-  // neglect/starvation death already in progress keeps its truer cause.
-  if (!isDead && ageSeconds >= NATURAL_LIFESPAN_SECONDS) {
+  if (ageSeconds >= NATURAL_LIFESPAN_SECONDS) {
     isDead = true;
     causeOfDeath = 'oldAge';
   }
@@ -272,6 +282,25 @@ export function play(state: PetState, now: number): PetState {
       ...simulated.stats,
       happiness: clamp(simulated.stats.happiness + PLAY_HAPPINESS_BOOST),
       hunger: clamp(simulated.stats.hunger - PLAY_HUNGER_COST),
+    },
+  };
+}
+
+/** Play a specific way (PET, FEATHER, LASER, …). Each lifts happiness, deepens the
+ *  bond, and — for active play — costs a little hunger (see game/play.ts). No-op if
+ *  the play is unknown, the pet is dead, or it isn't an animal. */
+export function playWith(state: PetState, playId: string, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  const def = playById(playId);
+  if (def === null) return simulated;
+  return {
+    ...simulated,
+    bond: deepenBond(simulated.bond ?? BOND_SEED, def.bond),
+    stats: {
+      ...simulated.stats,
+      happiness: clamp(simulated.stats.happiness + def.happiness),
+      hunger: clamp(simulated.stats.hunger - def.hunger),
     },
   };
 }
@@ -358,6 +387,34 @@ export function buyFood(state: PetState, foodId: string, now: number): PetState 
     },
     economy: { ...simulated.economy, coins: simulated.economy.coins - food.price },
   };
+}
+
+/** Buy an accessory (and wear it). Charges coins on first purchase; re-buying
+ *  something already owned just re-equips it, free. No-op if unknown, dead, or
+ *  unaffordable (the shop UI gates this too). */
+export function buyAccessory(state: PetState, accessoryId: string, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  const acc = accessoryById(accessoryId);
+  if (acc === null) return simulated;
+  const cos = simulated.cosmetics ?? defaultCosmetics();
+  // Already owned → wear it, no charge.
+  if (ownsAccessory(cos, accessoryId)) {
+    return { ...simulated, cosmetics: acquireCosmetic(cos, accessoryId) };
+  }
+  if (simulated.economy.coins < acc.price) return simulated;
+  return {
+    ...simulated,
+    economy: { ...simulated.economy, coins: simulated.economy.coins - acc.price },
+    cosmetics: acquireCosmetic(cos, accessoryId),
+  };
+}
+
+/** Wear / take off an owned accessory. No-op if dead or not owned. */
+export function toggleAccessory(state: PetState, accessoryId: string, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead) return simulated;
+  return { ...simulated, cosmetics: toggleCosmetic(simulated.cosmetics ?? defaultCosmetics(), accessoryId) };
 }
 
 /** Take a job you qualify for. */

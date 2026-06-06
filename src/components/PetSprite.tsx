@@ -184,6 +184,10 @@ interface PetSpriteProps {
   activity?: { key: PetActivity; nonce: number }; // bump nonce ⇒ play once
   ambient?: boolean;      // enable the self-driven idle scheduler (default false)
   isNight?: boolean;      // gate night-only ambient activities (default false)
+  // Worn accessories as a GRID×GRID grid of sprite indices (0 = nothing), painted
+  // over the base sprite. See game/cosmetics.compositeOverlay(). Skipped on the
+  // egg + ghost (you don't wear a hat as an egg, or in the afterlife).
+  overlay?: number[][] | null;
 }
 
 export function PetSprite({
@@ -196,6 +200,7 @@ export function PetSprite({
   activity,
   ambient = false,
   isNight = false,
+  overlay = null,
 }: PetSpriteProps): React.ReactElement {
   const isEgg = stage === 'egg';
   const sprite = isEgg ? SPRITE_EGG : getSprite(petType, mood);
@@ -203,6 +208,9 @@ export function PetSprite({
 
   // An egg gently wobbles (it's incubating, not dead); a ghost stays frozen.
   const isDead = mood === 'dead' && !isEgg;
+
+  // Accessories ride on a live cat only — never the egg or the ghost.
+  const wearables = isEgg || isDead ? null : overlay;
 
   // All motion (idle bob, one-shot activities, ambient wandering, overlay glyph)
   // lives in the hook so this component stays a pure renderer.
@@ -228,15 +236,20 @@ export function PetSprite({
     >
       {sprite.map((row, rowIdx) => (
         <View key={rowIdx} style={styles.row}>
-          {row.map((cell, colIdx) => (
-            <View
-              key={colIdx}
-              style={[
-                { width: cellSize, height: cellSize },
-                { backgroundColor: cellColor(cell, palette, bg) },
-              ]}
-            />
-          ))}
+          {row.map((cell, colIdx) => {
+            // A worn accessory paints over the base cell; 0 lets the cat show through.
+            const worn = wearables?.[rowIdx]?.[colIdx] ?? 0;
+            const idx = worn !== 0 ? worn : cell;
+            return (
+              <View
+                key={colIdx}
+                style={[
+                  { width: cellSize, height: cellSize },
+                  { backgroundColor: cellColor(idx, palette, bg) },
+                ]}
+              />
+            );
+          })}
         </View>
       ))}
 

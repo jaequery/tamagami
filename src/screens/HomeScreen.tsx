@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -18,6 +18,8 @@ import {
   shiftEarned,
   shiftElapsedSec,
 } from '../game/economy';
+import { compositeOverlay } from '../game/cosmetics';
+import { playById } from '../game/play';
 import {
   stageFor,
   isHatched,
@@ -60,7 +62,8 @@ import { CodexModal } from '../components/CodexModal';
 import { EventBanner } from '../components/EventBanner';
 import { EventReveal } from '../components/EventReveal';
 import { LineageModal } from '../components/LineageModal';
-import { ShopModal } from '../components/ShopModal';
+import { ShopModal, type ShopTab } from '../components/ShopModal';
+import { PlayModal } from '../components/PlayModal';
 import { CareerModal } from '../components/CareerModal';
 import { StoryModal } from '../components/StoryModal';
 import { ColdOpen } from '../components/ColdOpen';
@@ -436,6 +439,13 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const caption = hatched ? `${rarityEpithet(pet.rarity)} ${stage.toUpperCase()}` : null;
   const hatchIn = stage === 'egg' ? secondsUntilHatch(pet.ageSeconds) : 0;
 
+  // What she's wearing, as a sprite overlay (null = nothing on). The PetSprite
+  // skips it on the egg/ghost anyway; recomputed only when the worn set changes.
+  const accessoryOverlay = useMemo(
+    () => compositeOverlay(pet.cosmetics),
+    [pet.cosmetics],
+  );
+
   // ── Codex (collection) + share/codex modals ──
   const [discovered, setDiscovered] = useState<Set<FormId>>(new Set());
   const [codexOpen, setCodexOpen] = useState(false);
@@ -523,9 +533,15 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const working = isWorking(econ);
   const job = currentJob(econ);
   const [shopOpen, setShopOpen] = useState(false);
+  const [shopTab, setShopTab] = useState<ShopTab>('food');
   const [careerOpen, setCareerOpen] = useState(false);
-  const handleOpenShop = useCallback(() => setShopOpen(true), []);
+  const [playOpen, setPlayOpen] = useState(false);
+  // FEED opens the shop on FOOD; the dedicated SHOP button opens it on ITEMS.
+  const handleOpenShop = useCallback(() => { setShopTab('food'); setShopOpen(true); }, []);
+  const handleOpenStore = useCallback(() => { setShopTab('items'); setShopOpen(true); }, []);
   const handleCloseShop = useCallback(() => setShopOpen(false), []);
+  const handleOpenPlay = useCallback(() => setPlayOpen(true), []);
+  const handleClosePlay = useCallback(() => setPlayOpen(false), []);
   const handleOpenCareer = useCallback(() => setCareerOpen(true), []);
   const handleCloseCareer = useCallback(() => setCareerOpen(false), []);
 
@@ -539,18 +555,30 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
     setActivity({ key, nonce: activityNonceRef.current });
   }, []);
 
-  // PLAY alternates jump/dance by nonce parity (deterministic, no random).
-  const handlePlay = useCallback(() => {
-    activityNonceRef.current += 1;
-    const nonce = activityNonceRef.current;
-    setActivity({ key: nonce % 2 === 1 ? 'jump' : 'dance', nonce });
-    actions.play();
-  }, [actions]);
+  // PLAY opens a menu of ways to play; picking one fires that play's own animation
+  // (pet/cuddle → cheer+hearts, feather/laser → jump, yarn → dance) and closes.
+  const handlePlayWith = useCallback((playId: string) => {
+    const def = playById(playId);
+    if (def !== null) triggerActivity(def.activity);
+    actions.playWith(playId);
+    handleClosePlay();
+  }, [actions, triggerActivity, handleClosePlay]);
 
   // FEED actually happens in the shop; play 'eat' on a successful buy.
   const handleBuyFood = useCallback((foodId: string) => {
     triggerActivity('eat');
     actions.buyFood(foodId);
+  }, [actions, triggerActivity]);
+
+  // Buying / wearing an accessory: a little 'cheer' (she likes the new look).
+  const handleBuyAccessory = useCallback((id: string) => {
+    triggerActivity('cheer');
+    actions.buyAccessory(id);
+  }, [actions, triggerActivity]);
+
+  const handleToggleAccessory = useCallback((id: string) => {
+    triggerActivity('cheer');
+    actions.toggleAccessory(id);
   }, [actions, triggerActivity]);
 
   // SOCIALIZE: a nearby meet appearing fires a 'cheer'.
@@ -720,6 +748,7 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                   activity={activity}
                   ambient={!pet.isDead}
                   isNight={isNight(clockNow)}
+                  overlay={accessoryOverlay}
                 />
               </View>
 
@@ -772,12 +801,12 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                 {profile.actions.map((key) => {
                   const spec = ACTION_SPECS[key];
                   const isFeed = key === 'feed';
-                  // FEED opens the shop; PLAY triggers a pet animation before the
-                  // underlying action.
+                  // FEED opens the shop; PLAY opens the play menu; anything else
+                  // runs its action directly.
                   const onPress = isFeed
                     ? handleOpenShop
                     : key === 'play'
-                      ? handlePlay
+                      ? handleOpenPlay
                       : () => spec.run(actions);
                   return (
                     <PixelButton
@@ -790,6 +819,15 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                     />
                   );
                 })}
+                {animal && (
+                  <PixelButton
+                    label="SHOP"
+                    glyph="◈"
+                    onPress={handleOpenStore}
+                    disabled={pet.isDead}
+                    accessibilityLabel="Open the shop — food and accessories"
+                  />
+                )}
                 {animal && (
                   <PixelButton
                     label="WORK"
@@ -941,8 +979,17 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
           <ShopModal
             visible={shopOpen}
             coins={coins}
+            cosmetics={pet.cosmetics}
+            initialTab={shopTab}
             onBuy={handleBuyFood}
+            onBuyAccessory={handleBuyAccessory}
+            onToggleAccessory={handleToggleAccessory}
             onClose={handleCloseShop}
+          />
+          <PlayModal
+            visible={playOpen}
+            onPlay={handlePlayWith}
+            onClose={handleClosePlay}
           />
           <CareerModal
             visible={careerOpen}

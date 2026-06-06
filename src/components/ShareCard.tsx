@@ -20,6 +20,7 @@ import { householdFromId } from '../game/household';
 import { lifeSummaryCaption } from '../game/lifeSummary';
 import { epitaphFor } from '../game/lineage';
 import { PetSprite } from './PetSprite';
+import { compositeOverlay } from '../game/cosmetics';
 import { PixelText } from './PixelText';
 import { PixelButton } from './PixelButton';
 import {
@@ -142,6 +143,7 @@ export function ShareCard({ visible, pet, onClose }: ShareCardProps): React.Reac
               palette={palette}
               background={palette.bg}
               cellSize={8}
+              overlay={compositeOverlay(pet.cosmetics)}
             />
           </View>
 

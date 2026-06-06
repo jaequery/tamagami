@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
+  buyAccessory,
   buyFood,
   chooseJob,
   clockIn,
@@ -13,10 +14,12 @@ import {
   getMood,
   nameOwner as engineNameOwner,
   play,
+  playWith,
   quitJob,
   rename as engineRename,
   simulate,
   socialize,
+  toggleAccessory,
   treat,
   witnessEvent,
 } from '../game/engine';
@@ -167,6 +170,11 @@ export function usePet(): UsePet {
     applyState(play(petRef.current, Date.now()), true);
   }, [applyState]);
 
+  const actionPlayWith = useCallback((playId: string) => {
+    if (petRef.current === null) return;
+    applyState(playWith(petRef.current, playId, Date.now()), true);
+  }, [applyState]);
+
   const actionSocialize = useCallback(() => {
     if (petRef.current === null || petRef.current.isDead) return;
     applyState(socialize(petRef.current, Date.now()), true);
@@ -269,9 +277,21 @@ export function usePet(): UsePet {
     applyState(enroll(petRef.current, Date.now()), true);
   }, [applyState]);
 
+  // ── Cosmetics actions (cat) ──
+  const actionBuyAccessory = useCallback((id: string) => {
+    if (petRef.current === null) return;
+    applyState(buyAccessory(petRef.current, id, Date.now()), true);
+  }, [applyState]);
+
+  const actionToggleAccessory = useCallback((id: string) => {
+    if (petRef.current === null) return;
+    applyState(toggleAccessory(petRef.current, id, Date.now()), true);
+  }, [applyState]);
+
   const actions: PetActions = useMemo(() => ({
     feed: actionFeed,
     play: actionPlay,
+    playWith: actionPlayWith,
     socialize: actionSocialize,
     witnessEvent: actionWitnessEvent,
     treat: actionTreat,
@@ -287,7 +307,9 @@ export function usePet(): UsePet {
     quitJob: actionQuitJob,
     toggleWork: actionToggleWork,
     enroll: actionEnroll,
-  }), [actionFeed, actionPlay, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionBegin, actionNameOwner, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll]);
+    buyAccessory: actionBuyAccessory,
+    toggleAccessory: actionToggleAccessory,
+  }), [actionFeed, actionPlay, actionPlayWith, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionBegin, actionNameOwner, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll, actionBuyAccessory, actionToggleAccessory]);
 
   return {
     pet,

@@ -1,4 +1,5 @@
 import {
+  buyAccessory,
   comfortOwner,
   createHeir,
   createInitialPet,
@@ -6,16 +7,21 @@ import {
   getMood,
   nameOwner,
   play,
+  playWith,
   rename,
   restart,
   simulate,
   socialize,
+  toggleAccessory,
   treat,
 } from './engine';
+import { accessoryById } from './cosmetics';
+import { playById } from './play';
 import { NATURAL_LIFESPAN_SECONDS } from './lifespan';
 import { bondLevel } from './bond';
 import { dayIndex } from './events';
 import {
+  HEALTH_NEGLECT_FLOOR,
   HUNGER_CRITICAL_THRESHOLD,
   MAX_CATCHUP_SECONDS,
 } from './constants';
@@ -233,22 +239,36 @@ describe('cat', () => {
     expect(advanceSeconds(pet, 600).stats.health).toBeGreaterThan(50);
   });
 
-  it('health decays toward death when starving', () => {
+  it('starving sinks health to the floor but never kills (forgiving care)', () => {
     const pet = freshPet('cat', {
       stats: { hunger: 0, happiness: 60, health: 2, water: 100 },
     });
-    const advanced = advanceSeconds(pet, 3600);
-    expect(advanced.isDead).toBe(true);
-    expect(advanced.causeOfDeath).toBe('starvation');
+    const advanced = advanceSeconds(pet, 24 * 3600); // a full day ignored
+    expect(advanced.isDead).toBe(false);
+    expect(advanced.causeOfDeath).toBeNull();
+    expect(advanced.stats.health).toBe(HEALTH_NEGLECT_FLOOR);
   });
 
-  it('death cause is neglect when happiness — not hunger — bottomed out', () => {
+  it('an 8h sleep never ends the cat, even starting hungry', () => {
     const pet = freshPet('cat', {
-      stats: { hunger: 60, happiness: 0, health: 2, water: 100 },
+      stats: { hunger: 20, happiness: 30, health: 100, water: 100 },
     });
-    const advanced = advanceSeconds(pet, 3600);
-    expect(advanced.isDead).toBe(true);
-    expect(advanced.causeOfDeath).toBe('neglect');
+    const advanced = advanceSeconds(pet, 8 * 3600);
+    expect(advanced.isDead).toBe(false);
+    expect(advanced.stats.health).toBeGreaterThanOrEqual(HEALTH_NEGLECT_FLOOR);
+  });
+
+  it('a floored, neglected cat springs back the moment you feed her', () => {
+    const neglected = advanceSeconds(
+      freshPet('cat', { stats: { hunger: 0, happiness: 0, health: 100, water: 100 } }),
+      24 * 3600,
+    );
+    expect(neglected.stats.health).toBe(HEALTH_NEGLECT_FLOOR);
+    const fed = play(feed(neglected, neglected.lastTick), neglected.lastTick);
+    expect(fed.stats.hunger).toBeGreaterThan(neglected.stats.hunger);
+    expect(fed.stats.happiness).toBeGreaterThan(neglected.stats.happiness);
+    // needs back above critical → health now regenerates instead of floored
+    expect(advanceSeconds(fed, 600).stats.health).toBeGreaterThan(HEALTH_NEGLECT_FLOOR);
   });
 
   it('feed / play do nothing when dead', () => {
@@ -360,13 +380,94 @@ describe('socialize', () => {
 
 // ─── Sanity: critical threshold wiring ────────────────────────────────────────
 
-describe('starvation threshold', () => {
-  it('treats hunger at the critical threshold as starvation on death', () => {
+describe('critical threshold', () => {
+  it('hunger at the critical threshold sickens (floors health), never kills', () => {
     const pet = freshPet('cat', {
       stats: { hunger: HUNGER_CRITICAL_THRESHOLD, happiness: 60, health: 1, water: 100 },
     });
     const advanced = advanceSeconds(pet, 3600);
-    expect(advanced.isDead).toBe(true);
-    expect(advanced.causeOfDeath).toBe('starvation');
+    expect(advanced.isDead).toBe(false);
+    expect(advanced.stats.health).toBe(HEALTH_NEGLECT_FLOOR);
+  });
+});
+
+// ─── Play: the ways to play ────────────────────────────────────────────────────
+
+describe('playWith', () => {
+  it('a specific play lifts happiness, deepens the bond, and (if active) costs hunger', () => {
+    const feather = playById('feather')!;
+    const pet = freshPet('cat', {
+      bond: 10,
+      stats: { hunger: 60, happiness: 40, health: 100, water: 100 },
+    });
+    const after = playWith(pet, 'feather', NOW);
+    expect(after.stats.happiness).toBe(40 + feather.happiness);
+    expect(after.stats.hunger).toBe(60 - feather.hunger);
+    expect(after.bond).toBeGreaterThan(10);
+  });
+
+  it('calm play (PET) costs no hunger', () => {
+    const pet = freshPet('cat', { stats: { hunger: 50, happiness: 30, health: 100, water: 100 } });
+    const after = playWith(pet, 'pet', NOW);
+    expect(after.stats.hunger).toBe(50); // no cost
+    expect(after.stats.happiness).toBeGreaterThan(30);
+  });
+
+  it('clamps happiness at 100 and hunger at 0', () => {
+    const high = playWith(freshPet('cat', { stats: { hunger: 100, happiness: 95, health: 100, water: 100 } }), 'laser', NOW);
+    expect(high.stats.happiness).toBeLessThanOrEqual(100);
+    const low = playWith(freshPet('cat', { stats: { hunger: 3, happiness: 50, health: 100, water: 100 } }), 'laser', NOW);
+    expect(low.stats.hunger).toBe(0);
+  });
+
+  it('is a no-op for an unknown play or a dead cat', () => {
+    const pet = freshPet('cat', { stats: { hunger: 50, happiness: 50, health: 100, water: 100 } });
+    expect(playWith(pet, 'nope', NOW).stats.happiness).toBe(50);
+    const dead = freshPet('cat', { isDead: true, stats: { hunger: 50, happiness: 50, health: 0, water: 100 } });
+    expect(playWith(dead, 'feather', NOW).stats.happiness).toBe(50);
+  });
+});
+
+// ─── Cosmetics: buy + wear ─────────────────────────────────────────────────────
+
+describe('buyAccessory / toggleAccessory', () => {
+  const COLLAR = accessoryById('collar')!;
+
+  it('buying spends coins, records ownership, and auto-wears it', () => {
+    const pet = freshPet('cat', { economy: { ...freshPet('cat').economy, coins: 100 } });
+    const after = buyAccessory(pet, 'collar', NOW);
+    expect(after.economy.coins).toBe(100 - COLLAR.price);
+    expect(after.cosmetics.owned).toContain('collar');
+    expect(after.cosmetics.equipped.neck).toBe('collar');
+  });
+
+  it('does not charge twice — re-buying an owned item just re-wears it, free', () => {
+    const pet = freshPet('cat', { economy: { ...freshPet('cat').economy, coins: 100 } });
+    const bought = buyAccessory(pet, 'collar', NOW);
+    const off = toggleAccessory(bought, 'collar', NOW);
+    expect(off.cosmetics.equipped.neck).toBeNull();
+    const reworn = buyAccessory(off, 'collar', NOW);
+    expect(reworn.economy.coins).toBe(bought.economy.coins); // no extra charge
+    expect(reworn.cosmetics.equipped.neck).toBe('collar');
+  });
+
+  it('is a no-op when you cannot afford it', () => {
+    const pet = freshPet('cat', { economy: { ...freshPet('cat').economy, coins: 1 } });
+    const after = buyAccessory(pet, 'crown', NOW);
+    expect(after.cosmetics.owned).not.toContain('crown');
+    expect(after.economy.coins).toBe(1);
+  });
+
+  it('ignores unknown accessory ids', () => {
+    const pet = freshPet('cat', { economy: { ...freshPet('cat').economy, coins: 100 } });
+    const after = buyAccessory(pet, 'nope', NOW);
+    expect(after.economy.coins).toBe(100);
+    expect(after.cosmetics.owned).toEqual([]);
+  });
+
+  it('a dead cat can neither buy nor change outfits', () => {
+    const dead = freshPet('cat', { isDead: true, economy: { ...freshPet('cat').economy, coins: 100 } });
+    expect(buyAccessory(dead, 'collar', NOW).cosmetics.owned).toEqual([]);
+    expect(buyAccessory(dead, 'collar', NOW).economy.coins).toBe(100);
   });
 });

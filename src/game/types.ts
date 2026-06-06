@@ -51,6 +51,22 @@ export interface PetEconomy {
   studyEndsAt: number | null;// epoch ms the current study graduates
 }
 
+/**
+ * What the cat is WEARING and OWNS (see game/cosmetics.ts). A "realistic store"
+ * layer on the economy: buying costs coins, equipping is free and per-slot.
+ * Lives on the pet so a cat's wardrobe persists with the save and migrates
+ * tolerantly (old saves seed defaultCosmetics()). A new kitten / heir starts a
+ * fresh wardrobe — the coins are inherited, the collar isn't.
+ */
+export interface PetCosmetics {
+  owned: string[];                       // accessory ids purchased (see ACCESSORIES)
+  equipped: {                            // currently worn, at most one per slot
+    head: string | null;
+    face: string | null;
+    neck: string | null;
+  };
+}
+
 export interface PetState {
   version: number;
   petType: PetType;
@@ -71,11 +87,13 @@ export interface PetState {
   ownerMood: number;     // §5 her person's mood 0..100, ebbs on the real clock. See game/ownerLife.ts
   lastTreatedDay: number | null; // §9 local day-index she was last treated for an ailment, or null
   economy: PetEconomy;   // currency · marketplace · jobs · education (animals only)
+  cosmetics: PetCosmetics; // accessories owned + worn (see game/cosmetics.ts)
 }
 
 export interface PetActions {
   feed(): void;
   play(): void;
+  playWith(playId: string): void;                    // play a specific way (PET, FEATHER, LASER, …)
   socialize(): void;                                 // boost from meeting a nearby pet
   witnessEvent(eventId: string): void;               // any — record a live world event onto the pet
   treat(): void;                                     // §9 — tend an ailment (rest/vet/medicine); clears today's worry
@@ -92,6 +110,9 @@ export interface PetActions {
   quitJob(): void;                                   // leave your job
   toggleWork(): void;                                // clock in / clock out
   enroll(): void;                                    // enroll in the next education program
+  // ── Cosmetics (cat) ──
+  buyAccessory(id: string): void;                    // spend coins to buy + wear an accessory
+  toggleAccessory(id: string): void;                 // wear / take off an owned accessory
 }
 
 // ─── Social / nearby ──────────────────────────────────────────────────────────

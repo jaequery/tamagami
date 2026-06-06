@@ -78,7 +78,9 @@ export async function rescheduleCareNotifications(state: PetState): Promise<void
         return Notifications.scheduleNotificationAsync({
           identifier: `${CARE_NOTIFICATION_PREFIX}${p.stat}`,
           content: {
-            title: 'Your pet needs you!',
+            // Warm, time-aware nudge — never a guilt-trip or a death threat.
+            // Forgiving care: missing this only costs a moment, never the cat.
+            title: 'Thinking of you 🐾',
             body: p.label,
           },
           trigger: {
