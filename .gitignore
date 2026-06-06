@@ -9,6 +9,11 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Local build artifacts (eas build --local output)
+build/
+*.ipa
+*.app.dSYM.zip
+
 # Native
 .kotlin/
 *.orig.*
