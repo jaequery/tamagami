@@ -47,3 +47,7 @@ yarn-error.*
 
 # supabuild build artifacts (kept on disk, not in history)
 .supabuild/
+
+# Fredrin worker tooling (scoped credential — never commit) + session doc
+.fredrin/
+FREDRIN.md

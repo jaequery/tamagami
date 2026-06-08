@@ -6,3 +6,7 @@ nodeLinker: hoisted
 allowBuilds:
   msgpackr-extract: true
   unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - expo-asset@56.0.16
+  - expo-constants@56.0.17

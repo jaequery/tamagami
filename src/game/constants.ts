@@ -43,6 +43,12 @@ export const FEED_HAPPINESS_DELTA = 5;    // small happiness boost from a meal
 export const PLAY_HAPPINESS_BOOST = 25;   // +25 happiness per play session
 export const PLAY_HUNGER_COST = 8;        // −8 hunger (playing makes them hungry)
 
+// BOOP — tapping the cat sprite directly (a quick affectionate touch). Light by
+// design: pure delight, not a stat farm — far smaller than the menu PET play
+// (+12 fun / +3 bond) so the PLAY menu stays meaningful. No hunger cost.
+export const BOOP_HAPPINESS_BOOST = 4;    // +4 happiness per tap
+export const BOOP_BOND = 0.5;             // small bond deepen — presence, not grinding
+
 // ─── Notification thresholds ─────────────────────────────────────────────────
 // Stat value at/below which the user should be nudged
 export const NOTIFY_HUNGER_THRESHOLD = 20;

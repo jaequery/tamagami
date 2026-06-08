@@ -93,6 +93,7 @@ export interface PetState {
 export interface PetActions {
   feed(): void;
   play(): void;
+  boop(): void;                                      // tap the cat sprite directly — a quick affectionate touch
   playWith(playId: string): void;                    // play a specific way (PET, FEATHER, LASER, …)
   socialize(): void;                                 // boost from meeting a nearby pet
   witnessEvent(eventId: string): void;               // any — record a live world event onto the pet
