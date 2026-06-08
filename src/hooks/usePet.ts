@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
+  boop,
   buyAccessory,
   buyFood,
   chooseJob,
@@ -170,6 +171,11 @@ export function usePet(): UsePet {
     applyState(play(petRef.current, Date.now()), true);
   }, [applyState]);
 
+  const actionBoop = useCallback(() => {
+    if (petRef.current === null) return;
+    applyState(boop(petRef.current, Date.now()), true);
+  }, [applyState]);
+
   const actionPlayWith = useCallback((playId: string) => {
     if (petRef.current === null) return;
     applyState(playWith(petRef.current, playId, Date.now()), true);
@@ -291,6 +297,7 @@ export function usePet(): UsePet {
   const actions: PetActions = useMemo(() => ({
     feed: actionFeed,
     play: actionPlay,
+    boop: actionBoop,
     playWith: actionPlayWith,
     socialize: actionSocialize,
     witnessEvent: actionWitnessEvent,
@@ -309,7 +316,7 @@ export function usePet(): UsePet {
     enroll: actionEnroll,
     buyAccessory: actionBuyAccessory,
     toggleAccessory: actionToggleAccessory,
-  }), [actionFeed, actionPlay, actionPlayWith, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionBegin, actionNameOwner, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll, actionBuyAccessory, actionToggleAccessory]);
+  }), [actionFeed, actionPlay, actionBoop, actionPlayWith, actionSocialize, actionWitnessEvent, actionTreat, actionComfortOwner, actionContinueLine, actionSelectType, actionBegin, actionNameOwner, actionReset, actionRename, actionBuyFood, actionChooseJob, actionQuitJob, actionToggleWork, actionEnroll, actionBuyAccessory, actionToggleAccessory]);
 
   return {
     pet,

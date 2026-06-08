@@ -1,4 +1,5 @@
 import {
+  boop,
   buyAccessory,
   comfortOwner,
   createHeir,
@@ -425,6 +426,46 @@ describe('playWith', () => {
     expect(playWith(pet, 'nope', NOW).stats.happiness).toBe(50);
     const dead = freshPet('cat', { isDead: true, stats: { hunger: 50, happiness: 50, health: 0, water: 100 } });
     expect(playWith(dead, 'feather', NOW).stats.happiness).toBe(50);
+  });
+});
+
+// ─── boop (tap the cat directly — a quick touch) ───────────────────────────────
+
+describe('boop', () => {
+  it('lifts happiness and deepens the bond, with no hunger cost', () => {
+    const pet = freshPet('cat', {
+      bond: 10,
+      stats: { hunger: 60, happiness: 40, health: 100, water: 100 },
+    });
+    const after = boop(pet, NOW);
+    expect(after.stats.happiness).toBeGreaterThan(40);
+    expect(after.stats.hunger).toBe(60); // touch never tires her
+    expect(after.bond).toBeGreaterThan(10);
+  });
+
+  it('is lighter than a full PET play session (delight, not a stat farm)', () => {
+    const pet = freshPet('cat', { bond: 10, stats: { hunger: 60, happiness: 40, health: 100, water: 100 } });
+    const tapped = boop(pet, NOW);
+    const played = playWith(pet, 'pet', NOW);
+    expect(tapped.stats.happiness).toBeLessThan(played.stats.happiness);
+    expect(tapped.bond).toBeLessThan(played.bond);
+  });
+
+  it('clamps happiness at 100', () => {
+    const high = boop(freshPet('cat', { stats: { hunger: 100, happiness: 99, health: 100, water: 100 } }), NOW);
+    expect(high.stats.happiness).toBeLessThanOrEqual(100);
+  });
+
+  it('repeats: a second tap keeps lifting happiness', () => {
+    const pet = freshPet('cat', { stats: { hunger: 60, happiness: 40, health: 100, water: 100 } });
+    const once = boop(pet, NOW);
+    const twice = boop(once, NOW);
+    expect(twice.stats.happiness).toBeGreaterThan(once.stats.happiness);
+  });
+
+  it('is a no-op when dead', () => {
+    const dead = freshPet('cat', { isDead: true, stats: { hunger: 50, happiness: 50, health: 0, water: 100 } });
+    expect(boop(dead, NOW).stats.happiness).toBe(50);
   });
 });
 

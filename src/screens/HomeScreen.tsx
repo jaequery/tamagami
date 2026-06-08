@@ -8,6 +8,7 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import type { CauseOfDeath, LifeStage, Mood, PetActions, PetState } from '../game/types';
 import { isAnimal, profileFor } from '../game/profiles';
 import type { ActionKey } from '../game/profiles';
@@ -567,6 +568,15 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
     handleClosePlay();
   }, [actions, triggerActivity, handleClosePlay]);
 
+  // Tap the cat sprite itself → a quick affectionate boop. Instant feedback (light
+  // haptic + a 'cheer' squash-spin with a floating heart), a small happiness/bond
+  // nudge, and it settles back to idle on its own. Repeatable; only on a live cat.
+  const handleTapPet = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    triggerActivity('cheer');
+    actions.boop();
+  }, [actions, triggerActivity]);
+
   // FEED actually happens in the shop; play 'eat' on a successful buy.
   const handleBuyFood = useCallback((foodId: string) => {
     triggerActivity('eat');
@@ -673,6 +683,23 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
   const ageLabel = animal ? displayedAgeLabel(pet.ageSeconds) : formatAge(pet.ageSeconds);
   const stageLabel = animal ? catStageLabel(stage) : stage.toUpperCase();
 
+  // The cat sprite. A hatched, living cat is tappable (a direct boop); an egg is
+  // still incubating and a ghost is at rest, so neither reacts to touch.
+  const canBoop = hatched && !pet.isDead;
+  const petSprite = (
+    <PetSprite
+      petType={pet.petType}
+      mood={mood}
+      stage={stage}
+      palette={stage === 'egg' ? eggPalette : palette}
+      background={showRarityFrame ? palette.bg : LCD_BG}
+      activity={activity}
+      ambient={!pet.isDead}
+      isNight={isNight(clockNow)}
+      overlay={accessoryOverlay}
+    />
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <BackgroundMusic muted={musicMuted} />
@@ -743,17 +770,18 @@ export function HomeScreen({ pet, actions, mood }: HomeScreenProps): React.React
                   },
                 ]}
               >
-                <PetSprite
-                  petType={pet.petType}
-                  mood={mood}
-                  stage={stage}
-                  palette={stage === 'egg' ? eggPalette : palette}
-                  background={showRarityFrame ? palette.bg : LCD_BG}
-                  activity={activity}
-                  ambient={!pet.isDead}
-                  isNight={isNight(clockNow)}
-                  overlay={accessoryOverlay}
-                />
+                {canBoop ? (
+                  <TouchableOpacity
+                    onPress={handleTapPet}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Pet ${pet.name.trim() || 'your cat'} — tap to play`}
+                  >
+                    {petSprite}
+                  </TouchableOpacity>
+                ) : (
+                  petSprite
+                )}
               </View>
 
               {stage === 'egg' ? (

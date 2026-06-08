@@ -34,6 +34,8 @@ import {
 } from './cosmetics';
 import { playById } from './play';
 import {
+  BOOP_BOND,
+  BOOP_HAPPINESS_BOOST,
   CURRENT_VERSION,
   FEED_HAPPINESS_DELTA,
   FEED_HUNGER_BOOST,
@@ -282,6 +284,23 @@ export function play(state: PetState, now: number): PetState {
       ...simulated.stats,
       happiness: clamp(simulated.stats.happiness + PLAY_HAPPINESS_BOOST),
       hunger: clamp(simulated.stats.hunger - PLAY_HUNGER_COST),
+    },
+  };
+}
+
+/** A direct touch — tapping the cat sprite itself (a quick affectionate boop).
+ *  Lifts happiness a little and deepens the bond a touch, with NO hunger cost;
+ *  far lighter than a full play session, so it's delight rather than a stat farm.
+ *  No-op when the pet is dead or isn't an animal (simulates first, like the rest). */
+export function boop(state: PetState, now: number): PetState {
+  const simulated = simulate(state, now);
+  if (simulated.isDead || !isAnimal(simulated.petType)) return simulated;
+  return {
+    ...simulated,
+    bond: deepenBond(simulated.bond ?? BOND_SEED, BOOP_BOND), // a touch of presence (§8)
+    stats: {
+      ...simulated.stats,
+      happiness: clamp(simulated.stats.happiness + BOOP_HAPPINESS_BOOST),
     },
   };
 }
